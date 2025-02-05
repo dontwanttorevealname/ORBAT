@@ -58,8 +58,6 @@ CREATE TABLE group_members (
 );
 
 
-// ... existing code until weapons INSERT ...
-
 -- Test data for weapons
 INSERT INTO weapons (weapon_id, weapon_name, weapon_type, weapon_caliber) VALUES
 (1, 'M4A1', 'Assault Rifle', '5.56mm'),

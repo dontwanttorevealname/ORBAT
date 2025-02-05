@@ -91,7 +91,7 @@ INSERT INTO members (member_id, member_role, member_rank, weapon_id) VALUES
 -- Test data for teams
 INSERT INTO teams (team_id, team_name, team_size) VALUES
 (1, 'Alpha', 4),
-(2, 'Bravo', 4)
+(2, 'Bravo', 4),
 (3, 'Charlie', 2),
 (4, 'Delta', 2);
 

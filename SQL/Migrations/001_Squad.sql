@@ -7,6 +7,7 @@ DROP TABLE IF EXISTS members;
 DROP TABLE IF EXISTS weapons;
 
 
+
 CREATE TABLE weapons (
     weapon_id INTEGER PRIMARY KEY,
     weapon_name TEXT,

@@ -18,7 +18,7 @@ CREATE TABLE members (
     member_id INTEGER PRIMARY KEY,
     member_role TEXT,
     member_rank TEXT,
-    weapon_id TEXT,
+    weapon_id INTEGER,
     FOREIGN KEY (weapon_id) REFERENCES weapons(weapon_id)
 );
 

@@ -1,0 +1,63 @@
+{
+    "Group": {
+      "type": "object",
+      "properties": {
+        "group_id": { "type": "integer" },
+        "group_name": { "type": "string" },
+        "group_nationality": { "type": "string" },
+        "group_size": { "type": "integer" },
+        "group_members": {
+          "type": "object",
+          "properties": {
+            "Member": {
+              "type": "object",
+              "properties": {
+                "member_id": { "type": "integer" },
+                "member_role": { "type": "string" },
+                "member_rank": { "type": "string" },
+                "member_weapon": {
+                  "type": "object",
+                  "properties": {
+                    "weapon_id": { "type": "integer" },
+                    "weapon_name": { "type": "string" },
+                    "weapon_type": { "type": "string" },
+                    "caliber": { "type": "string" }
+                  }
+                }
+              }
+            },
+            "Team": {
+              "type": "object",
+              "properties": {
+                "team_id": { "type": "integer" },
+                "team_name": { "type": "string" },
+                "team_size": { "type": "integer" },
+                "team_members": {
+                  "type": "object",
+                  "properties": {
+                    "Member": {
+                      "type": "object",
+                      "properties": {
+                        "member_id": { "type": "integer" },
+                        "member_role": { "type": "string" },
+                        "member_rank": { "type": "string" },
+                        "member_weapon": {
+                          "type": "object",
+                          "properties": {
+                            "weapon_id": { "type": "integer" },
+                            "weapon_name": { "type": "string" },
+                            "weapon_type": { "type": "string" },
+                            "caliber": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }

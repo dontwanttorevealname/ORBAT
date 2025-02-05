@@ -1,0 +1,123 @@
+{
+    "group_id": 1,
+    "group_name": "Ranger Rifle Squad",
+    "group_nationality": "United States of America",
+    "group_size": 9,
+    "group_members": {
+      "Squad Leader": {
+        "member_id": 1,
+        "member_role": "Group Leader",
+        "member_rank": "Staff Sergeant",
+        "member_weapon": {
+          "weapon_id": 1,
+          "weapon_name": "M4",
+          "weapon_type": "Assault Rifle",
+          "caliber": "5.56mm"
+        }
+      },
+      "teams": {
+        "Alpha": {
+          "team_id": 1,
+          "team_name": "Alpha",
+          "team_size": 4,
+          "team_members": {
+            "Team Leader": {
+              "member_id": 2,
+              "member_role": "Team Leader",
+              "member_rank": "Sergeant",
+              "member_weapon": {
+                "weapon_id": 1,
+                "weapon_name": "M4",
+                "weapon_type": "Assault Rifle",
+                "caliber": "5.56mm"
+              }
+            },
+            "Automatic Rifleman": {
+              "member_id": 3,
+              "member_role": "Automatic Rifleman",
+              "member_rank": "Corporal",
+              "member_weapon": {
+                "weapon_id": 2,
+                "weapon_name": "M249",
+                "weapon_type": "Squad Automatic Weapon",
+                "caliber": "5.56mm"
+              }
+            },
+            "Rifleman #1": {
+              "member_id": 4,
+              "member_role": "Rifleman",
+              "member_rank": "Lance Corporal",
+              "member_weapon": {
+                "weapon_id": 1,
+                "weapon_name": "M4",
+                "weapon_type": "Assault Rifle",
+                "caliber": "5.56mm"
+              }
+            },
+            "Rifleman #2": {
+              "member_id": 5,
+              "member_role": "Rifleman",
+              "member_rank": "Lance Corporal",
+              "member_weapon": {
+                "weapon_id": 1,
+                "weapon_name": "M4",
+                "weapon_type": "Assault Rifle",
+                "caliber": "5.56mm"
+              }
+            }
+          }
+        },
+        "Bravo": {
+          "team_id": 2,
+          "team_name": "Bravo",
+          "team_size": 4,
+          "team_members": {
+            "Team Leader": {
+              "member_id": 6,
+              "member_role": "Team Leader",
+              "member_rank": "Sergeant",
+              "member_weapon": {
+                "weapon_id": 1,
+                "weapon_name": "M4",
+                "weapon_type": "Assault Rifle",
+                "caliber": "5.56mm"
+              }
+            },
+            "Automatic Rifleman": {
+              "member_id": 7,
+              "member_role": "Automatic Rifleman",
+              "member_rank": "Corporal",
+              "member_weapon": {
+                "weapon_id": 2,
+                "weapon_name": "M249",
+                "weapon_type": "Squad Automatic Weapon",
+                "caliber": "5.56mm"
+              }
+            },
+            "Rifleman #1": {
+              "member_id": 8,
+              "member_role": "Rifleman",
+              "member_rank": "Lance Corporal",
+              "member_weapon": {
+                "weapon_id": 1,
+                "weapon_name": "M4",
+                "weapon_type": "Assault Rifle",
+                "caliber": "5.56mm"
+              }
+            },
+            "Rifleman #2": {
+              "member_id": 9,
+              "member_role": "Rifleman",
+              "member_rank": "Lance Corporal",
+              "member_weapon": {
+                "weapon_id": 1,
+                "weapon_name": "M4",
+                "weapon_type": "Assault Rifle",
+                "caliber": "5.56mm"
+              }
+            }
+          }
+        }
+      }
+    }
+  }

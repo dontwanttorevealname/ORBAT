@@ -1,0 +1,29 @@
+> Group - Object
+    group_id - Int
+    group_name - String
+    group_nationality - String
+    group_size - Int
+    > group_members - Object
+        > Member - Object
+            member_id - int
+            member_role - string
+            member_rank - string
+            > member_weapon - Object
+                weapon_id - int
+                weapon_name - string
+                weapon_type - string
+                caliber - string
+        > Team - Object
+            team_id - Int
+            team_name - String
+            team_size - String
+            > team_members - Object
+                > Member - Object
+                    member_id - int
+                    member_role - string
+                    member_rank - string
+                    > member_weapon - Object
+                        weapon_id - int
+                        weapon_name - string
+                        weapon_type - string
+                        caliber - string

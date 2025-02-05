@@ -6,3 +6,4 @@ fi
 
 cd SQL/Migrations
 goose turso "$DATABASE_URL" up
+

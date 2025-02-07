@@ -25,10 +25,10 @@ type Weapon struct {
 }
 
 type Member struct {
-    ID     int
-    Role   string
-    Rank   string
-    Weapon Weapon
+    ID      int
+    Role    string
+    Rank    string
+    Weapons []Weapon
 }
 
 type Team struct {
@@ -155,6 +155,10 @@ func main() {
                 h2, h3 {
                     color: #333;
                 }
+                .weapons {
+                    margin-left: 20px;
+                    color: #666;
+                }
             </style>
         </head>
         <body>
@@ -167,7 +171,14 @@ func main() {
                 {{range .DirectMembers}}
                 <div class="member">
                     <h3>{{.Role}} - {{.Rank}}</h3>
-                    <p>Weapon: {{.Weapon.Name}} ({{.Weapon.Type}}, {{.Weapon.Caliber}})</p>
+                    <div class="weapons">
+                        <p>Weapons:</p>
+                        <ul>
+                        {{range .Weapons}}
+                            <li>{{.Name}} ({{.Type}}, {{.Caliber}})</li>
+                        {{end}}
+                        </ul>
+                    </div>
                 </div>
                 {{end}}
             </div>
@@ -182,7 +193,14 @@ func main() {
                     {{range .Members}}
                     <div class="member">
                         <h4>{{.Role}} - {{.Rank}}</h4>
-                        <p>Weapon: {{.Weapon.Name}} ({{.Weapon.Type}}, {{.Weapon.Caliber}})</p>
+                        <div class="weapons">
+                            <p>Weapons:</p>
+                            <ul>
+                            {{range .Weapons}}
+                                <li>{{.Name}} ({{.Type}}, {{.Caliber}})</li>
+                            {{end}}
+                            </ul>
+                        </div>
                     </div>
                     {{end}}
                 </div>
@@ -233,13 +251,11 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
         return group, err
     }
 
-    // Get direct members
+    // Get direct members with their weapons
     memberRows, err := db.Query(`
-        SELECT m.member_id, m.member_role, m.member_rank, 
-               w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
+        SELECT DISTINCT m.member_id, m.member_role, m.member_rank
         FROM group_members gm
         JOIN members m ON gm.member_id = m.member_id
-        JOIN weapons w ON m.weapon_id = w.weapon_id
         WHERE gm.group_id = ? AND gm.team_id IS NULL`, groupID)
     if err != nil {
         return group, err
@@ -248,12 +264,31 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
 
     for memberRows.Next() {
         var m Member
-        var w Weapon
-        err := memberRows.Scan(&m.ID, &m.Role, &m.Rank, &w.ID, &w.Name, &w.Type, &w.Caliber)
+        err := memberRows.Scan(&m.ID, &m.Role, &m.Rank)
         if err != nil {
             return group, err
         }
-        m.Weapon = w
+
+        // Get weapons for this member
+        weaponRows, err := db.Query(`
+            SELECT w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
+            FROM members_weapons mw
+            JOIN weapons w ON mw.weapon_id = w.weapon_id
+            WHERE mw.member_id = ?`, m.ID)
+        if err != nil {
+            return group, err
+        }
+        defer weaponRows.Close()
+
+        for weaponRows.Next() {
+            var w Weapon
+            err := weaponRows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber)
+            if err != nil {
+                return group, err
+            }
+            m.Weapons = append(m.Weapons, w)
+        }
+
         group.DirectMembers = append(group.DirectMembers, m)
     }
 
@@ -275,13 +310,11 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
             return group, err
         }
 
-        // Get team members
+        // Get team members with their weapons
         teamMemberRows, err := db.Query(`
-            SELECT m.member_id, m.member_role, m.member_rank,
-                   w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
+            SELECT DISTINCT m.member_id, m.member_role, m.member_rank
             FROM team_members tm
             JOIN members m ON tm.member_id = m.member_id
-            JOIN weapons w ON m.weapon_id = w.weapon_id
             WHERE tm.team_id = ?`, team.ID)
         if err != nil {
             return group, err
@@ -290,12 +323,31 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
 
         for teamMemberRows.Next() {
             var m Member
-            var w Weapon
-            err := teamMemberRows.Scan(&m.ID, &m.Role, &m.Rank, &w.ID, &w.Name, &w.Type, &w.Caliber)
+            err := teamMemberRows.Scan(&m.ID, &m.Role, &m.Rank)
             if err != nil {
                 return group, err
             }
-            m.Weapon = w
+
+            // Get weapons for this team member
+            weaponRows, err := db.Query(`
+                SELECT w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
+                FROM members_weapons mw
+                JOIN weapons w ON mw.weapon_id = w.weapon_id
+                WHERE mw.member_id = ?`, m.ID)
+            if err != nil {
+                return group, err
+            }
+            defer weaponRows.Close()
+
+            for weaponRows.Next() {
+                var w Weapon
+                err := weaponRows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber)
+                if err != nil {
+                    return group, err
+                }
+                m.Weapons = append(m.Weapons, w)
+            }
+
             team.Members = append(team.Members, m)
         }
 
@@ -303,4 +355,4 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
     }
 
     return group, nil
-}	
+}

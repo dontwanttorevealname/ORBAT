@@ -5,6 +5,5 @@ if [ -f .env ]; then
 fi
 
 cd SQL/Migrations
-goose turso "$DATABASE_URL" down
 goose turso "$DATABASE_URL" up
 

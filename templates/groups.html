@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Military Order of Battle</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .group {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .nav {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .nav a {
+            margin-right: 15px;
+        }
+        .delete-btn {
+            background: #cc0000;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .delete-btn:hover {
+            background: #aa0000;
+        }
+        .group-info {
+            flex-grow: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/weapons">View Weapons List</a>
+        <a href="/add_group">Add New Group</a>
+    </div>
+    <h1>Military Order of Battle</h1>
+    {{range .}}
+    <div class="group">
+        <div class="group-info">
+            <a href="/group/{{.ID}}">{{.Name}}</a> - {{.Nationality}} (Size: {{.Size}})
+        </div>
+        <form method="POST" action="/group/{{.ID}}/delete" style="display: inline;">
+            <button type="submit" class="delete-btn">Delete</button>
+        </form>
+    </div>
+    {{end}}
+</body>
+</html>

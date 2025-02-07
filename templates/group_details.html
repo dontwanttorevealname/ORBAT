@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{.Name}} - Details</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .member, .team {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        h2, h3 {
+            color: #333;
+        }
+        .weapons {
+            margin-left: 20px;
+            color: #666;
+        }
+        .weapons-form {
+            margin-top: 10px;
+        }
+        .weapons-form select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+        .edit-weapons-btn {
+            background: #0066cc;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .weapons-dialog {
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .weapons-dialog::backdrop {
+            background: rgba(0, 0, 0, 0.5);
+        }
+        .dialog-buttons {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .dialog-buttons button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .dialog-buttons button[type="submit"] {
+            background: #0066cc;
+            color: white;
+        }
+        .dialog-buttons button[type="button"] {
+            background: #ddd;
+        }
+        select[multiple] {
+            width: 100%;
+            min-width: 300px;
+        }
+        .nav {
+            margin-bottom: 20px;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/">Back to Groups</a>
+    </div>
+
+    <h1>{{.Name}} ({{.Nationality}})</h1>
+    <p>Total Size: {{.Size}}</p>
+    
+    {{if .DirectMembers}}
+    <div class="section">
+        <h2>Direct Members</h2>
+        {{range .DirectMembers}}
+        <div class="member">
+            <h3>{{.Role}} - {{.Rank}}</h3>
+            <div class="weapons">
+                <p>Weapons:</p>
+                <ul>
+                {{range .Weapons}}
+                    <li><a href="/weapon/{{.ID}}">{{.Name}}</a> ({{.Type}}, {{.Caliber}})</li>
+                {{end}}
+                </ul>
+                <button class="edit-weapons-btn" onclick="editWeapons({{.ID}})">Edit Weapons</button>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{end}}
+
+    {{if .Teams}}
+    <div class="section">
+        <h2>Teams</h2>
+        {{range .Teams}}
+        <div class="team">
+            <h3>{{.Name}} (Size: {{.Size}})</h3>
+            {{range .Members}}
+            <div class="member">
+                <h4>{{.Role}} - {{.Rank}}</h4>
+                <div class="weapons">
+                    <p>Weapons:</p>
+                    <ul>
+                    {{range .Weapons}}
+                        <li><a href="/weapon/{{.ID}}">{{.Name}}</a> ({{.Type}}, {{.Caliber}})</li>
+                    {{end}}
+                    </ul>
+                    <button class="edit-weapons-btn" onclick="editWeapons({{.ID}})">Edit Weapons</button>
+                </div>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+    {{end}}
+
+    <dialog id="weaponsDialog" class="weapons-dialog">
+        <h3>Edit Member Weapons</h3>
+        <p>Hold Ctrl (Cmd on Mac) to select multiple weapons</p>
+        <form method="POST" id="weaponsForm">
+            <div id="weaponSelects"></div>
+            <div class="dialog-buttons">
+                <button type="button" onclick="closeDialog()">Cancel</button>
+                <button type="submit">Save Changes</button>
+            </div>
+        </form>
+    </dialog>
+
+
+    <script>
+        const dialog = document.getElementById('weaponsDialog');
+        const form = document.getElementById('weaponsForm');
+        
+        async function editWeapons(memberId) {
+            try {
+                const response = await fetch(`/member/${memberId}/weapons`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                form.action = `/member/${memberId}/weapons`;
+                
+                const container = document.getElementById('weaponSelects');
+                container.innerHTML = '';
+                
+                // Create multiple select for weapons
+                const select = document.createElement('select');
+                select.name = 'weapons[]';
+                select.multiple = true;
+                select.size = 10;
+                
+                // Ensure data.all exists and is an array
+                const allWeapons = Array.isArray(data.all) ? data.all : [];
+                // Ensure data.current exists and is an array
+                const currentWeapons = Array.isArray(data.current) ? data.current : [];
+                
+                allWeapons.forEach(weapon => {
+                    const option = document.createElement('option');
+                    option.value = weapon.ID;
+                    option.textContent = `${weapon.Name} (${weapon.Type}, ${weapon.Caliber})`;
+                    option.selected = currentWeapons.some(w => w.ID === weapon.ID);
+                    select.appendChild(option);
+                });
+                
+                container.appendChild(select);
+                dialog.showModal();
+            } catch (error) {
+                console.error('Error fetching weapons:', error);
+                alert('There was an error loading the weapons. Please try again.');
+            }
+        }
+        
+        function closeDialog() {
+            dialog.close();
+        }
+    
+        // Close dialog when clicking outside
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) {
+                closeDialog();
+            }
+        });
+    </script>
+</body>
+</html>

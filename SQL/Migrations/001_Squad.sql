@@ -117,7 +117,7 @@ INSERT INTO team_members (team_id, member_id) VALUES
 -- Test data for groups
 INSERT INTO groups (group_id, group_name, group_size, group_nationality) VALUES
 (1, 'Ranger Rifle Squad', 9, 'United States of America'),
-(2, 'Machine Gun Squad', 5, 'United States of America');
+(2, 'Ranger Machine Gun Squad', 5, 'United States of America');
 
 
 -- Test data for group_members
@@ -128,74 +128,6 @@ INSERT INTO group_members (group_id, member_id, team_id) VALUES
 (2, 10, NULL),     -- Machine Gun Squad Leader
 (2, NULL, 3),      -- Charlie Team
 (2, NULL, 4);      -- Delta Team
-
-
--- Additional test queries
--- 4. Show full squad composition with hierarchy
-WITH squad_composition AS (
-    -- Get individual members (Squad Leader)
-    SELECT 
-        g.group_name,
-        m.member_role,
-        m.member_rank,
-        NULL as team_name,
-        w.weapon_name
-    FROM groups g
-    JOIN group_members gm ON g.group_id = gm.group_id
-    JOIN members m ON gm.member_id = m.member_id
-    JOIN weapons w ON m.weapon_id = w.weapon_id
-    WHERE gm.team_id IS NULL
-
-    UNION ALL
-
-    -- Get team members
-    SELECT 
-        g.group_name,
-        m.member_role,
-        m.member_rank,
-        t.team_name,
-        w.weapon_name
-    FROM groups g
-    JOIN group_members gm ON g.group_id = gm.group_id
-    JOIN teams t ON gm.team_id = t.team_id
-    JOIN team_members tm ON t.team_id = tm.team_id
-    JOIN members m ON tm.member_id = m.member_id
-    JOIN weapons w ON m.weapon_id = w.weapon_id
-)
-SELECT * FROM squad_composition ORDER BY 
-    CASE 
-        WHEN member_role = 'Squad Leader' THEN 1
-        WHEN team_name = 'Alpha' THEN 2
-        WHEN team_name = 'Bravo' THEN 3
-        ELSE 4
-    END,
-    CASE 
-        WHEN member_role = 'Team Leader' THEN 1
-        WHEN member_role = 'Automatic Rifleman' THEN 2
-        ELSE 3
-    END;
-
--- 5. Weapon distribution analysis
-SELECT 
-    w.weapon_type,
-    COUNT(*) as count,
-    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM members), 2) as percentage
-FROM weapons w
-JOIN members m ON w.weapon_id = m.weapon_id
-GROUP BY w.weapon_type
-ORDER BY count DESC;
-
--- 6. Team equipment summary
-SELECT 
-    t.team_name,
-    COUNT(DISTINCT m.member_id) as member_count,
-    COUNT(DISTINCT w.weapon_type) as unique_weapon_types,
-    GROUP_CONCAT(DISTINCT w.weapon_type) as weapon_types
-FROM teams t
-JOIN team_members tm ON t.team_id = tm.team_id
-JOIN members m ON tm.member_id = m.member_id
-JOIN weapons w ON m.weapon_id = w.weapon_id
-GROUP BY t.team_name;
 
 
 -- +goose Down

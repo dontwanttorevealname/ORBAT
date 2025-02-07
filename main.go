@@ -2,10 +2,13 @@ package main
 
 import (
     "database/sql"
+    "encoding/json"
     "fmt"
     "html/template"
     "net/http"
     "os"
+    "path/filepath"
+	"strings"
     _ "github.com/tursodatabase/libsql-client-go/libsql"
     "github.com/joho/godotenv"
 )
@@ -47,14 +50,40 @@ type GroupDetails struct {
     Teams         []Team
 }
 
+type WeaponUser struct {
+    Role     string
+    Rank     string
+    TeamName string
+}
+
+type WeaponGroupUsers struct {
+    GroupName    string
+    GroupID      int
+    Nationality  string
+    Users        []WeaponUser
+}
+
+type WeaponDetails struct {
+    Weapon       Weapon
+    TotalUsers   int
+    Groups       []WeaponGroupUsers
+    CountryCount int
+    Countries    []string
+}
+
+var templates *template.Template
+
+func init() {
+    templatesDir := "templates"
+    templates = template.Must(template.ParseGlob(filepath.Join(templatesDir, "*.html")))
+}
+
 func main() {
-    // Load .env file
     if err := godotenv.Load(); err != nil {
         fmt.Printf("Error loading .env file: %v\n", err)
         return
     }
 
-    // Connect to the database using environment variable
     db, err := sql.Open("libsql", os.Getenv("DATABASE_URL"))
     if err != nil {
         fmt.Printf("Failed to connect to database: %v\n", err)
@@ -75,152 +104,198 @@ func main() {
             return
         }
 
-        tmpl := `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Military Order of Battle</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    max-width: 800px;
-                    margin: 0 auto;
-                    padding: 20px;
-                }
-                h1 {
-                    color: #333;
-                }
-                .group {
-                    margin: 10px 0;
-                    padding: 10px;
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                }
-                a {
-                    color: #0066cc;
-                    text-decoration: none;
-                }
-                a:hover {
-                    text-decoration: underline;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>Military Order of Battle</h1>
-            {{range .}}
-            <div class="group">
-                <a href="/group/{{.ID}}">{{.Name}}</a> - {{.Nationality}} (Size: {{.Size}})
-            </div>
-            {{end}}
-        </body>
-        </html>`
-
-        t := template.Must(template.New("groups").Parse(tmpl))
-        t.Execute(w, groups)
+        if err := templates.ExecuteTemplate(w, "groups.html", groups); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
     })
 
-    // Handler for group details
+    // Handler for weapons list and weapon addition
+    http.HandleFunc("/weapons", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" {
+            if err := r.ParseForm(); err != nil {
+                http.Error(w, err.Error(), http.StatusBadRequest)
+                return
+            }
+
+            name := r.FormValue("name")
+            weaponType := r.FormValue("type")
+            caliber := r.FormValue("caliber")
+
+            _, err := db.Exec(`
+                INSERT INTO weapons (weapon_name, weapon_type, weapon_caliber)
+                VALUES (?, ?, ?)`, name, weaponType, caliber)
+            if err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            http.Redirect(w, r, "/weapons", http.StatusSeeOther)
+            return
+        }
+
+        weapons, err := getWeapons(db)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        if err := templates.ExecuteTemplate(w, "weapons.html", weapons); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+    })
+
+    // Handler for managing member weapons
+    http.HandleFunc("/member/", func(w http.ResponseWriter, r *http.Request) {
+        pathParts := strings.Split(r.URL.Path, "/")
+        if len(pathParts) != 4 || pathParts[3] != "weapons" {
+            http.NotFound(w, r)
+            return
+        }
+
+        memberID := pathParts[2]
+
+        if r.Method == "POST" {
+            if err := r.ParseForm(); err != nil {
+                http.Error(w, err.Error(), http.StatusBadRequest)
+                return
+            }
+
+            if err := updateMemberWeapons(db, memberID, r.Form["weapons[]"]); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            // Redirect back to the referring page
+            http.Redirect(w, r, r.Header.Get("Referer"), http.StatusSeeOther)
+            return
+        }
+
+        // For GET requests, return JSON of current weapons and all available weapons
+        weapons, err := getMemberWeaponsData(db, memberID)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(weapons)
+    })
+
+    // Handler for weapon details and deletion
+    http.HandleFunc("/weapon/", func(w http.ResponseWriter, r *http.Request) {
+        pathParts := strings.Split(r.URL.Path, "/")
+        if len(pathParts) < 3 {
+            http.NotFound(w, r)
+            return
+        }
+
+        id := pathParts[2]
+        if len(pathParts) == 4 && pathParts[3] == "delete" {
+            if r.Method != "POST" {
+                http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+                return
+            }
+
+            if err := deleteWeapon(db, id); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            http.Redirect(w, r, "/weapons", http.StatusSeeOther)
+            return
+        }
+
+        details, err := getWeaponDetails(db, id)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        if err := templates.ExecuteTemplate(w, "weapon_details.html", details); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+    })
+
+    // Handler for group details and deletion
     http.HandleFunc("/group/", func(w http.ResponseWriter, r *http.Request) {
-        id := r.URL.Path[len("/group/"):]
+        pathParts := strings.Split(r.URL.Path, "/")
+        if len(pathParts) < 3 {
+            http.NotFound(w, r)
+            return
+        }
+
+        id := pathParts[2]
+        if len(pathParts) == 4 && pathParts[3] == "delete" {
+            if r.Method != "POST" {
+                http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+                return
+            }
+
+            if err := deleteGroup(db, id); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            http.Redirect(w, r, "/", http.StatusSeeOther)
+            return
+        }
+
         group, err := getGroupDetails(db, id)
         if err != nil {
             http.Error(w, err.Error(), http.StatusInternalServerError)
             return
         }
 
-        tmpl := `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>{{.Name}} - Details</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    max-width: 800px;
-                    margin: 0 auto;
-                    padding: 20px;
-                }
-                .section {
-                    margin: 20px 0;
-                    padding: 15px;
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                }
-                .member, .team {
-                    margin: 10px 0;
-                    padding: 10px;
-                    background: #f5f5f5;
-                    border-radius: 4px;
-                }
-                h2, h3 {
-                    color: #333;
-                }
-                .weapons {
-                    margin-left: 20px;
-                    color: #666;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>{{.Name}} ({{.Nationality}})</h1>
-            <p>Total Size: {{.Size}}</p>
-            
-            {{if .DirectMembers}}
-            <div class="section">
-                <h2>Direct Members</h2>
-                {{range .DirectMembers}}
-                <div class="member">
-                    <h3>{{.Role}} - {{.Rank}}</h3>
-                    <div class="weapons">
-                        <p>Weapons:</p>
-                        <ul>
-                        {{range .Weapons}}
-                            <li>{{.Name}} ({{.Type}}, {{.Caliber}})</li>
-                        {{end}}
-                        </ul>
-                    </div>
-                </div>
-                {{end}}
-            </div>
-            {{end}}
-
-            {{if .Teams}}
-            <div class="section">
-                <h2>Teams</h2>
-                {{range .Teams}}
-                <div class="team">
-                    <h3>{{.Name}} (Size: {{.Size}})</h3>
-                    {{range .Members}}
-                    <div class="member">
-                        <h4>{{.Role}} - {{.Rank}}</h4>
-                        <div class="weapons">
-                            <p>Weapons:</p>
-                            <ul>
-                            {{range .Weapons}}
-                                <li>{{.Name}} ({{.Type}}, {{.Caliber}})</li>
-                            {{end}}
-                            </ul>
-                        </div>
-                    </div>
-                    {{end}}
-                </div>
-                {{end}}
-            </div>
-            {{end}}
-            
-            <p><a href="/">Back to Groups</a></p>
-        </body>
-        </html>`
-
-        t := template.Must(template.New("group").Parse(tmpl))
-        t.Execute(w, group)
+        if err := templates.ExecuteTemplate(w, "group_details.html", group); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
     })
 
-    fmt.Println("Server starting on http://localhost:8080")
-    if err := http.ListenAndServe(":8080", nil); err != nil {
+    // Handler for adding new groups
+    http.HandleFunc("/add_group", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" {
+            if err := r.ParseForm(); err != nil {
+                http.Error(w, err.Error(), http.StatusBadRequest)
+                return
+            }
+
+            if err := handleAddGroup(db, r); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+            http.Redirect(w, r, "/", http.StatusSeeOther)
+            return
+        }
+
+        // Get weapons for the dropdown
+        weapons, err := getWeapons(db)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        data := struct {
+            WeaponOptions template.JS
+        }{
+            WeaponOptions: template.JS(weaponsToJSON(weapons)),
+        }
+
+        if err := templates.ExecuteTemplate(w, "add_group.html", data); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+    })
+
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = "8080"
+    }
+
+    fmt.Printf("Server starting on http://localhost:%s\n", port)
+    if err := http.ListenAndServe(":"+port, nil); err != nil {
         fmt.Printf("Server error: %v\n", err)
     }
 }
+
 
 func getGroups(db *sql.DB) ([]Group, error) {
     rows, err := db.Query("SELECT group_id, group_name, group_size, group_nationality FROM groups")
@@ -240,10 +315,27 @@ func getGroups(db *sql.DB) ([]Group, error) {
     return groups, nil
 }
 
+func getWeapons(db *sql.DB) ([]Weapon, error) {
+    rows, err := db.Query("SELECT weapon_id, weapon_name, weapon_type, weapon_caliber FROM weapons ORDER BY weapon_name")
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var weapons []Weapon
+    for rows.Next() {
+        var w Weapon
+        if err := rows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber); err != nil {
+            return nil, err
+        }
+        weapons = append(weapons, w)
+    }
+    return weapons, nil
+}
+
 func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
     var group GroupDetails
     
-    // Get basic group info
     err := db.QueryRow(`
         SELECT group_id, group_name, group_size, group_nationality 
         FROM groups WHERE group_id = ?`, groupID).Scan(&group.ID, &group.Name, &group.Size, &group.Nationality)
@@ -251,7 +343,6 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
         return group, err
     }
 
-    // Get direct members with their weapons
     memberRows, err := db.Query(`
         SELECT DISTINCT m.member_id, m.member_role, m.member_rank
         FROM group_members gm
@@ -269,7 +360,6 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
             return group, err
         }
 
-        // Get weapons for this member
         weaponRows, err := db.Query(`
             SELECT w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
             FROM members_weapons mw
@@ -292,7 +382,6 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
         group.DirectMembers = append(group.DirectMembers, m)
     }
 
-    // Get teams and their members
     teamRows, err := db.Query(`
         SELECT DISTINCT t.team_id, t.team_name, t.team_size
         FROM group_members gm
@@ -310,7 +399,6 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
             return group, err
         }
 
-        // Get team members with their weapons
         teamMemberRows, err := db.Query(`
             SELECT DISTINCT m.member_id, m.member_role, m.member_rank
             FROM team_members tm
@@ -328,7 +416,6 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
                 return group, err
             }
 
-            // Get weapons for this team member
             weaponRows, err := db.Query(`
                 SELECT w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
                 FROM members_weapons mw
@@ -355,4 +442,562 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
     }
 
     return group, nil
+}
+
+func getWeaponDetails(db *sql.DB, weaponID string) (WeaponDetails, error) {
+    var details WeaponDetails
+
+    err := db.QueryRow(`
+        SELECT weapon_id, weapon_name, weapon_type, weapon_caliber 
+        FROM weapons WHERE weapon_id = ?`, weaponID).Scan(
+        &details.Weapon.ID, &details.Weapon.Name, &details.Weapon.Type, &details.Weapon.Caliber)
+    if err != nil {
+        return details, err
+    }
+
+    rows, err := db.Query(`
+        SELECT 
+            g.group_id,
+            g.group_name,
+            g.group_nationality,
+            m.member_role,
+            m.member_rank,
+            t.team_name
+        FROM members_weapons mw
+        JOIN members m ON mw.member_id = m.member_id
+        LEFT JOIN (
+            SELECT member_id, group_id, NULL as team_id 
+            FROM group_members 
+            WHERE team_id IS NULL
+            UNION ALL
+            SELECT tm.member_id, gm.group_id, tm.team_id
+            FROM team_members tm
+            JOIN group_members gm ON tm.team_id = gm.team_id
+        ) membership ON m.member_id = membership.member_id
+        LEFT JOIN groups g ON membership.group_id = g.group_id
+        LEFT JOIN teams t ON membership.team_id = t.team_id
+        WHERE mw.weapon_id = ?
+        ORDER BY g.group_name, t.team_name`, weaponID)
+    if err != nil {
+        return details, err
+    }
+    defer rows.Close()
+
+    groupMap := make(map[int]*WeaponGroupUsers)
+    countryMap := make(map[string]bool)
+    userCount := 0
+
+    for rows.Next() {
+        var groupID sql.NullInt64
+        var groupName sql.NullString
+        var nationality sql.NullString
+        var role string
+        var rank string
+        var teamName sql.NullString
+
+        err := rows.Scan(&groupID, &groupName, &nationality, &role, &rank, &teamName)
+        if err != nil {
+            return details, err
+        }
+
+        user := WeaponUser{
+            Role: role,
+            Rank: rank,
+        }
+        if teamName.Valid {
+            user.TeamName = teamName.String
+        }
+
+        gID := -1
+        gName := "Unassigned"
+        nat := "Unknown"
+        
+        if groupID.Valid {
+            gID = int(groupID.Int64)
+            gName = groupName.String
+            nat = nationality.String
+            countryMap[nat] = true
+        }
+
+        if group, exists := groupMap[gID]; exists {
+            group.Users = append(group.Users, user)
+        } else {
+            groupMap[gID] = &WeaponGroupUsers{
+                GroupID:     gID,
+                GroupName:   gName,
+                Nationality: nat,
+                Users:      []WeaponUser{user},
+            }
+        }
+        userCount++
+    }
+
+    details.TotalUsers = userCount
+    
+    for country := range countryMap {
+        details.Countries = append(details.Countries, country)
+    }
+    details.CountryCount = len(details.Countries)
+    
+    for gid, group := range groupMap {
+        if gid != -1 {
+            details.Groups = append(details.Groups, *group)
+        }
+    }
+    if unassigned, exists := groupMap[-1]; exists {
+        details.Groups = append(details.Groups, *unassigned)
+    }
+
+    return details, nil
+}
+
+func weaponsToJSON(weapons []Weapon) string {
+    type jsonWeapon struct {
+        ID      int    `json:"ID"`
+        Name    string `json:"Name"`
+        Type    string `json:"Type"`
+        Caliber string `json:"Caliber"`
+    }
+
+    jsonWeapons := make([]jsonWeapon, len(weapons))
+    for i, w := range weapons {
+		jsonWeapons[i] = jsonWeapon{
+            ID:      w.ID,
+            Name:    w.Name,
+            Type:    w.Type,
+            Caliber: w.Caliber,
+        }
+    }
+
+    jsonData, err := json.Marshal(jsonWeapons)
+    if err != nil {
+        return "[]"
+    }
+    return string(jsonData)
+}
+
+func handleAddGroup(db *sql.DB, r *http.Request) error {
+    if err := r.ParseForm(); err != nil {
+        return err
+    }
+
+    tx, err := db.Begin()
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    // Insert group
+    result, err := tx.Exec(`
+        INSERT INTO groups (group_name, group_nationality, group_size)
+        VALUES (?, ?, 0)`,
+        r.FormValue("name"),
+        r.FormValue("nationality"))
+    if err != nil {
+        return err
+    }
+
+    groupID, err := result.LastInsertId()
+    if err != nil {
+        return err
+    }
+
+    // Handle direct members
+    directMemberRoles := r.Form["directMembers_role[]"]
+    directMemberRanks := r.Form["directMembers_rank[]"]
+    
+    for i := range directMemberRoles {
+        // Insert member
+        result, err := tx.Exec(`
+            INSERT INTO members (member_role, member_rank)
+            VALUES (?, ?)`,
+            directMemberRoles[i], directMemberRanks[i])
+        if err != nil {
+            return err
+        }
+
+        memberID, err := result.LastInsertId()
+        if err != nil {
+            return err
+        }
+
+        // Link member to group
+        _, err = tx.Exec(`
+            INSERT INTO group_members (group_id, member_id)
+            VALUES (?, ?)`,
+            groupID, memberID)
+        if err != nil {
+            return err
+        }
+
+        // Add weapons for this member
+        weaponKey := fmt.Sprintf("weapons_%d[]", i)
+        for _, weaponID := range r.Form[weaponKey] {
+            _, err = tx.Exec(`
+                INSERT INTO members_weapons (member_id, weapon_id)
+                VALUES (?, ?)`,
+                memberID, weaponID)
+            if err != nil {
+                return err
+            }
+        }
+    }
+
+    // Handle teams
+    teamNames := r.Form["team_name[]"]
+    for teamIndex := range teamNames {
+        // Create team
+        result, err := tx.Exec(`
+            INSERT INTO teams (team_name, team_size)
+            VALUES (?, 0)`,
+            teamNames[teamIndex])
+        if err != nil {
+            return err
+        }
+
+        teamID, err := result.LastInsertId()
+        if err != nil {
+            return err
+        }
+
+        // Link team to group
+        _, err = tx.Exec(`
+            INSERT INTO group_members (group_id, team_id)
+            VALUES (?, ?)`,
+            groupID, teamID)
+        if err != nil {
+            return err
+        }
+
+        // Get team member data
+        teamMemberRoles := r.Form[fmt.Sprintf("team_%d_role[]", teamIndex)]
+        teamMemberRanks := r.Form[fmt.Sprintf("team_%d_rank[]", teamIndex)]
+
+        for memberIndex := range teamMemberRoles {
+            // Insert team member
+            result, err := tx.Exec(`
+                INSERT INTO members (member_role, member_rank)
+                VALUES (?, ?)`,
+                teamMemberRoles[memberIndex],
+                teamMemberRanks[memberIndex])
+            if err != nil {
+                return err
+            }
+
+            memberID, err := result.LastInsertId()
+            if err != nil {
+                return err
+            }
+
+            // Link member to team
+            _, err = tx.Exec(`
+                INSERT INTO team_members (team_id, member_id)
+                VALUES (?, ?)`,
+                teamID, memberID)
+            if err != nil {
+                return err
+            }
+
+            // Add weapons for this team member
+            weaponKey := fmt.Sprintf("team_%d_weapons_%d[]", teamIndex, memberIndex)
+            for _, weaponID := range r.Form[weaponKey] {
+                _, err = tx.Exec(`
+                    INSERT INTO members_weapons (member_id, weapon_id)
+                    VALUES (?, ?)`,
+                    memberID, weaponID)
+                if err != nil {
+                    return err
+                }
+            }
+        }
+
+        // Update team size
+        _, err = tx.Exec(`
+            UPDATE teams 
+            SET team_size = (
+                SELECT COUNT(*) 
+                FROM team_members 
+                WHERE team_id = ?
+            )
+            WHERE team_id = ?`,
+            teamID, teamID)
+        if err != nil {
+            return err
+        }
+    }
+
+    // Update group size
+    if err := updateGroupSize(tx, int(groupID)); err != nil {
+        return err
+    }
+
+    return tx.Commit()
+}
+
+func addMemberToGroup(tx *sql.Tx, groupID int, role, rank string, teamID *int64, r *http.Request) error {
+    // Insert member
+    result, err := tx.Exec(`
+        INSERT INTO members (member_role, member_rank)
+        VALUES (?, ?)`,
+        role, rank)
+    if err != nil {
+        return err
+    }
+
+    memberID, err := result.LastInsertId()
+    if err != nil {
+        return err
+    }
+
+    // Link member to group/team
+    if teamID != nil {
+        _, err = tx.Exec(`
+            INSERT INTO team_members (team_id, member_id)
+            VALUES (?, ?)`,
+            *teamID, memberID)
+    } else {
+        _, err = tx.Exec(`
+            INSERT INTO group_members (group_id, member_id)
+            VALUES (?, ?)`,
+            groupID, memberID)
+    }
+    if err != nil {
+        return err
+    }
+
+    // Add weapons for this member
+    weaponIDs := r.Form[fmt.Sprintf("weapons[]")]
+    for _, weaponID := range weaponIDs {
+        _, err = tx.Exec(`
+            INSERT INTO members_weapons (member_id, weapon_id)
+            VALUES (?, ?)`,
+            memberID, weaponID)
+        if err != nil {
+            return err
+        }
+    }
+
+    return nil
+}
+
+func updateGroupSize(tx *sql.Tx, groupID int) error {
+    _, err := tx.Exec(`
+        UPDATE groups 
+        SET group_size = (
+            SELECT COUNT(DISTINCT m.member_id)
+            FROM members m
+            LEFT JOIN group_members gm ON m.member_id = gm.member_id
+            LEFT JOIN team_members tm ON m.member_id = tm.member_id
+            LEFT JOIN group_members gt ON tm.team_id = gt.team_id
+            WHERE gm.group_id = ? OR gt.group_id = ?
+        )
+        WHERE group_id = ?`,
+        groupID, groupID, groupID)
+    return err
+}
+
+
+func deleteWeapon(db *sql.DB, weaponID string) error {
+    tx, err := db.Begin()
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    // Delete weapon associations first
+    _, err = tx.Exec("DELETE FROM members_weapons WHERE weapon_id = ?", weaponID)
+    if err != nil {
+        return err
+    }
+
+    // Delete the weapon itself
+    _, err = tx.Exec("DELETE FROM weapons WHERE weapon_id = ?", weaponID)
+    if err != nil {
+        return err
+    }
+
+    return tx.Commit()
+}
+
+func deleteGroup(db *sql.DB, groupID string) error {
+    tx, err := db.Begin()
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    // 1. First get all member IDs (both direct and team members) associated with this group
+    memberIDs := make(map[string]bool)
+
+    // Get direct member IDs
+    directRows, err := tx.Query(`
+        SELECT member_id 
+        FROM group_members 
+        WHERE group_id = ? AND team_id IS NULL`, groupID)
+    if err != nil {
+        return err
+    }
+    defer directRows.Close()
+
+    for directRows.Next() {
+        var memberID string
+        if err := directRows.Scan(&memberID); err != nil {
+            return err
+        }
+        memberIDs[memberID] = true
+    }
+
+    // Get team member IDs
+    teamMemberRows, err := tx.Query(`
+        SELECT tm.member_id
+        FROM team_members tm
+        JOIN group_members gm ON tm.team_id = gm.team_id
+        WHERE gm.group_id = ?`, groupID)
+    if err != nil {
+        return err
+    }
+    defer teamMemberRows.Close()
+
+    for teamMemberRows.Next() {
+        var memberID string
+        if err := teamMemberRows.Scan(&memberID); err != nil {
+            return err
+        }
+        memberIDs[memberID] = true
+    }
+
+    // 2. Delete all weapon associations for these members
+    for memberID := range memberIDs {
+        _, err = tx.Exec("DELETE FROM members_weapons WHERE member_id = ?", memberID)
+        if err != nil {
+            return err
+        }
+    }
+
+    // 3. Delete team_members associations
+    _, err = tx.Exec(`
+        DELETE FROM team_members 
+        WHERE team_id IN (
+            SELECT team_id 
+            FROM group_members 
+            WHERE group_id = ? AND team_id IS NOT NULL
+        )`, groupID)
+    if err != nil {
+        return err
+    }
+
+    // 4. Delete group_members associations
+    _, err = tx.Exec("DELETE FROM group_members WHERE group_id = ?", groupID)
+    if err != nil {
+        return err
+    }
+
+    // 5. Delete all members
+    for memberID := range memberIDs {
+        _, err = tx.Exec("DELETE FROM members WHERE member_id = ?", memberID)
+        if err != nil {
+            return err
+        }
+    }
+
+    // 6. Delete teams
+    _, err = tx.Exec(`
+        DELETE FROM teams 
+        WHERE team_id IN (
+            SELECT DISTINCT team_id 
+            FROM group_members 
+            WHERE group_id = ? AND team_id IS NOT NULL
+        )`, groupID)
+    if err != nil {
+        return err
+    }
+
+    // 7. Finally delete the group itself
+    _, err = tx.Exec("DELETE FROM groups WHERE group_id = ?", groupID)
+    if err != nil {
+        return err
+    }
+
+    return tx.Commit()
+}
+
+func getMemberWeaponsData(db *sql.DB, memberID string) (map[string]interface{}, error) {
+    // Get all available weapons
+    allWeapons, err := getWeapons(db)
+    if err != nil {
+        return nil, err
+    }
+
+    // Get member's current weapons
+    rows, err := db.Query(`
+        SELECT w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
+        FROM members_weapons mw
+        JOIN weapons w ON mw.weapon_id = w.weapon_id
+        WHERE mw.member_id = ?`, memberID)
+    if err != nil {
+        // If there's an error querying current weapons, still return all weapons
+        // but with an empty current weapons array
+        return map[string]interface{}{
+            "all":     allWeapons,
+            "current": []Weapon{},
+        }, nil
+    }
+    defer rows.Close()
+
+    var currentWeapons []Weapon
+    for rows.Next() {
+        var w Weapon
+        if err := rows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber); err != nil {
+            // If there's an error scanning a weapon, skip it and continue
+            continue
+        }
+        currentWeapons = append(currentWeapons, w)
+    }
+
+    // Even if there are no current weapons, we still return a valid response
+    return map[string]interface{}{
+        "all":     allWeapons,
+        "current": currentWeapons,
+    }, nil
+}
+
+func updateMemberWeapons(db *sql.DB, memberID string, weaponIDs []string) error {
+    tx, err := db.Begin()
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    // Remove all existing weapons for this member
+    _, err = tx.Exec("DELETE FROM members_weapons WHERE member_id = ?", memberID)
+    if err != nil {
+        return err
+    }
+
+    // If no weapons were selected, just return after deleting existing weapons
+    if len(weaponIDs) == 0 {
+        return tx.Commit()
+    }
+
+    // Add new weapons
+    for _, weaponID := range weaponIDs {
+        // Verify the weapon exists before inserting
+        var exists bool
+        err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM weapons WHERE weapon_id = ?)", weaponID).Scan(&exists)
+        if err != nil {
+            return err
+        }
+        if !exists {
+            continue // Skip weapons that don't exist
+        }
+
+        _, err = tx.Exec(
+            "INSERT INTO members_weapons (member_id, weapon_id) VALUES (?, ?)",
+            memberID, weaponID)
+        if err != nil {
+            return err
+        }
+    }
+
+    return tx.Commit()
 }

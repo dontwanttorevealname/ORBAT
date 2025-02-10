@@ -24,9 +24,9 @@ jobs:
 
     - name: Deploy to Cloud Run
       run: |
-         gcloud run deploy orbat \                           
-          --source . \                                                                    
-          --region europe-central2 \                   
+        gcloud run deploy orbat \
+          --source . \
+          --region europe-central2 \
           --allow-unauthenticated \
           --timeout 300 \
-          --set-env-vars DATABASE_URL="libsql://orbat-db-dontwanttorevealname.turso.io?authToken=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3Mzg3NjEwNDEsImlkIjoiN2ZiODA0ZjktMzZhZC00M2ViLWI1ZDQtZDYxODg0YTYwNjE0In0.031CrsCX2HtB5ZPZoICKLZCBoFZU2cCZvweIzg3w97s7kMhbFhK-2k3ECbyc0K5pLrOcaGjpdOWdnk8qc3NgBg"
+          --set-env-vars DATABASE_URL="${{ secrets.DATABASE_URL }}"

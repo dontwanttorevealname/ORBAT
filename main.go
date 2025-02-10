@@ -1,30 +1,35 @@
 package main
 
 import (
+    "cloud.google.com/go/storage"
+    "context"
     "database/sql"
     "encoding/json"
     "fmt"
     "html/template"
+    "io"
     "net/http"
     "os"
     "path/filepath"
-	"strings"
+    "strings"
+    "time"
     _ "github.com/tursodatabase/libsql-client-go/libsql"
     "github.com/joho/godotenv"
 )
 
 type Group struct {
-    ID           int    
-    Name         string
-    Size         int
-    Nationality  string
+    ID          int
+    Name        string
+    Size        int
+    Nationality string
 }
 
 type Weapon struct {
-    ID      int
-    Name    string
-    Type    string
-    Caliber string
+    ID       int
+    Name     string
+    Type     string
+    Caliber  string
+    ImageURL string
 }
 
 type Member struct {
@@ -71,25 +76,100 @@ type WeaponDetails struct {
     Countries    []string
 }
 
-var templates *template.Template
+
+var (
+    templates     *template.Template
+    db           *sql.DB
+    storageClient *storage.Client
+    bucketName   string
+)
 
 func init() {
+    // Initialize templates with better error handling
     templatesDir := "templates"
-    templates = template.Must(template.ParseGlob(filepath.Join(templatesDir, "*.html")))
+    var err error
+    templates, err = template.ParseGlob(filepath.Join(templatesDir, "*.html"))
+    if err != nil {
+        fmt.Printf("Fatal: Failed to parse templates: %v\n", err)
+        os.Exit(1)
+    }
+
+    // Load environment variables but don't exit if .env is missing
+    if err := godotenv.Load(); err != nil {
+        fmt.Printf("Info: .env file not found, using environment variables\n")
+    }
+
+    // Initialize database connection with retry logic
+    maxRetries := 5
+    for i := 0; i < maxRetries; i++ {
+        db, err = sql.Open("libsql", os.Getenv("DATABASE_URL"))
+        if err == nil {
+            // Test the connection
+            if err = db.Ping(); err == nil {
+                fmt.Printf("Successfully connected to database\n")
+                break
+            }
+        }
+        fmt.Printf("Attempt %d: Failed to connect to database: %v\n", i+1, err)
+        if i < maxRetries-1 {
+            time.Sleep(time.Second * 2)
+        }
+    }
+    if err != nil {
+        fmt.Printf("Fatal: Could not establish database connection after %d attempts\n", maxRetries)
+        os.Exit(1)
+    }
+
+    // Initialize Google Cloud Storage
+    ctx := context.Background()
+    storageClient, err = storage.NewClient(ctx)
+    if err != nil {
+        fmt.Printf("Failed to create storage client: %v\n", err)
+        os.Exit(1)
+    }
+
+    bucketName = os.Getenv("GCS_BUCKET_NAME")
+    if bucketName == "" {
+        fmt.Printf("GCS_BUCKET_NAME environment variable not set\n")
+        os.Exit(1)
+    }
 }
 
-func main() {
-    if err := godotenv.Load(); err != nil {
-        fmt.Printf("Error loading .env file: %v\n", err)
-        return
+func uploadImageToGCS(file io.Reader, filename string) (string, error) {
+    ctx := context.Background()
+    ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
+    defer cancel()
+
+    bucket := storageClient.Bucket(bucketName)
+    obj := bucket.Object(filename)
+
+    writer := obj.NewWriter(ctx)
+    if _, err := io.Copy(writer, file); err != nil {
+        return "", err
+    }
+    if err := writer.Close(); err != nil {
+        return "", err
     }
 
-    db, err := sql.Open("libsql", os.Getenv("DATABASE_URL"))
-    if err != nil {
-        fmt.Printf("Failed to connect to database: %v\n", err)
-        return
+    // Make the object public
+    if err := obj.ACL().Set(ctx, storage.AllUsers, storage.RoleReader); err != nil {
+        return "", err
     }
-    defer db.Close()
+
+    return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketName, filename), nil
+}
+
+
+func main() {
+    // Ensure database and storage client are closed
+    defer func() {
+        if db != nil {
+            db.Close()
+        }
+        if storageClient != nil {
+            storageClient.Close()
+        }
+    }()
 
     // Handler for the root path - shows all groups
     http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +192,8 @@ func main() {
     // Handler for weapons list and weapon addition
     http.HandleFunc("/weapons", func(w http.ResponseWriter, r *http.Request) {
         if r.Method == "POST" {
-            if err := r.ParseForm(); err != nil {
+            // Parse multipart form
+            if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB max
                 http.Error(w, err.Error(), http.StatusBadRequest)
                 return
             }
@@ -120,10 +201,33 @@ func main() {
             name := r.FormValue("name")
             weaponType := r.FormValue("type")
             caliber := r.FormValue("caliber")
+            
+            var imageURL string
+            
+            // Handle image upload
+            file, header, err := r.FormFile("image")
+            if err == nil {
+                defer file.Close()
+                
+                // Generate unique filename
+                ext := filepath.Ext(header.Filename)
+                filename := fmt.Sprintf("weapons/%s-%d%s", 
+                    strings.ToLower(strings.ReplaceAll(name, " ", "-")),
+                    time.Now().Unix(),
+                    ext)
+                
+                // Upload to GCS
+                imageURL, err = uploadImageToGCS(file, filename)
+                if err != nil {
+                    http.Error(w, err.Error(), http.StatusInternalServerError)
+                    return
+                }
+            }
 
-            _, err := db.Exec(`
-                INSERT INTO weapons (weapon_name, weapon_type, weapon_caliber)
-                VALUES (?, ?, ?)`, name, weaponType, caliber)
+            // Insert weapon with image URL
+            _, err = db.Exec(`
+                INSERT INTO weapons (weapon_name, weapon_type, weapon_caliber, image_url)
+                VALUES (?, ?, ?, ?)`, name, weaponType, caliber, imageURL)
             if err != nil {
                 http.Error(w, err.Error(), http.StatusInternalServerError)
                 return
@@ -165,12 +269,10 @@ func main() {
                 return
             }
 
-            // Redirect back to the referring page
             http.Redirect(w, r, r.Header.Get("Referer"), http.StatusSeeOther)
             return
         }
 
-        // For GET requests, return JSON of current weapons and all available weapons
         weapons, err := getMemberWeaponsData(db, memberID)
         if err != nil {
             http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -267,7 +369,6 @@ func main() {
             return
         }
 
-        // Get weapons for the dropdown
         weapons, err := getWeapons(db)
         if err != nil {
             http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -285,17 +386,39 @@ func main() {
         }
     })
 
+    // Add basic health check endpoint
+    http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+        // Check database connection
+        if err := db.Ping(); err != nil {
+            w.WriteHeader(http.StatusServiceUnavailable)
+            fmt.Fprintf(w, "Database connection error: %v", err)
+            return
+        }
+        w.WriteHeader(http.StatusOK)
+        fmt.Fprintf(w, "OK")
+    })
+
+    // Get port from environment variable
     port := os.Getenv("PORT")
     if port == "" {
         port = "8080"
     }
 
-    fmt.Printf("Server starting on http://localhost:%s\n", port)
-    if err := http.ListenAndServe(":"+port, nil); err != nil {
-        fmt.Printf("Server error: %v\n", err)
+    // Create a server with timeouts
+    srv := &http.Server{
+        Addr:         ":" + port,
+        ReadTimeout:  15 * time.Second,
+        WriteTimeout: 15 * time.Second,
+        IdleTimeout:  60 * time.Second,
+    }
+
+    // Start server with improved logging
+    fmt.Printf("Server starting on port %s\n", port)
+    if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+        fmt.Printf("Fatal: Server error: %v\n", err)
+        os.Exit(1)
     }
 }
-
 
 func getGroups(db *sql.DB) ([]Group, error) {
     rows, err := db.Query("SELECT group_id, group_name, group_size, group_nationality FROM groups")
@@ -332,6 +455,7 @@ func getWeapons(db *sql.DB) ([]Weapon, error) {
     }
     return weapons, nil
 }
+
 
 func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
     var group GroupDetails

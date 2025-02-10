@@ -1,0 +1,5 @@
+runtime: go121  # Use Go 1.21
+main: .
+
+env_variables:
+  DATABASE_URL: "your-turso-database-url"  # Will be set through Cloud Console

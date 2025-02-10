@@ -75,6 +75,15 @@
         .weapon-info {
             flex-grow: 1;
         }
+
+        .help-text {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+        }
+        input[type="file"] {
+            padding: 8px 0;
+        }
     </style>
 </head>
 <body>
@@ -86,7 +95,7 @@
 
     <div class="add-form">
         <h2>Add New Weapon</h2>
-        <form method="POST" action="/weapons">
+        <form method="POST" action="/weapons" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="name">Weapon Name:</label>
                 <input type="text" id="name" name="name" required>
@@ -98,6 +107,11 @@
             <div class="form-group">
                 <label for="caliber">Caliber:</label>
                 <input type="text" id="caliber" name="caliber" required>
+            </div>
+            <div class="form-group">
+                <label for="image">Weapon Image:</label>
+                <input type="file" id="image" name="image" accept="image/*">
+                <p class="help-text">Supported formats: JPG, PNG, GIF. Max size: 5MB</p>
             </div>
             <button type="submit">Add Weapon</button>
         </form>

@@ -36,3 +36,7 @@ jobs:
           --timeout 300 \
           --set-env-vars DATABASE_URL="${{ secrets.DATABASE_URL }}" \
           --project ${{ secrets.GCP_PROJECT_ID }}
+        gcloud run services add-iam-policy-binding orbat \
+          --region=europe-central2 \
+          --member=allUsers \
+          --role=roles/run.invoker

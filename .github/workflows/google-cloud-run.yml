@@ -8,6 +8,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+
     steps:
     - uses: actions/checkout@v4
 
@@ -33,8 +37,7 @@ jobs:
           --source . \
           --region europe-central2 \
           --timeout 300 \
-          --set-env-vars DATABASE_URL="${{ secrets.DATABASE_URL }}",  \
-          GCS_BUCKET_NAME="${{ secrets.GCS_BUCKET_NAME }}" \
+          --set-env-vars DATABASE_URL="${{ secrets.DATABASE_URL }}",GCS_BUCKET_NAME="${{ secrets.GCS_BUCKET_NAME }}" \
           --project ${{ secrets.GCP_PROJECT_ID }}
         gcloud run services add-iam-policy-binding orbat \
           --region=europe-central2 \

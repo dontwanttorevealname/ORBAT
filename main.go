@@ -572,9 +572,9 @@ func getWeaponDetails(db *sql.DB, weaponID string) (WeaponDetails, error) {
     var details WeaponDetails
 
     err := db.QueryRow(`
-        SELECT weapon_id, weapon_name, weapon_type, weapon_caliber 
+        SELECT weapon_id, weapon_name, weapon_type, weapon_caliber, image_url 
         FROM weapons WHERE weapon_id = ?`, weaponID).Scan(
-        &details.Weapon.ID, &details.Weapon.Name, &details.Weapon.Type, &details.Weapon.Caliber)
+        &details.Weapon.ID, &details.Weapon.Name, &details.Weapon.Type, &details.Weapon.Caliber, &details.Weapon.ImageURL)
     if err != nil {
         return details, err
     }

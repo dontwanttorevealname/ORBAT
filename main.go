@@ -991,6 +991,13 @@ func deleteWeapon(db *sql.DB, weaponID string) error {
     }
     defer tx.Rollback()
 
+    // Get the image URL before deleting the weapon
+    var imageURL sql.NullString
+    err = tx.QueryRow("SELECT image_url FROM weapons WHERE weapon_id = ?", weaponID).Scan(&imageURL)
+    if err != nil {
+        return err
+    }
+
     // Delete weapon associations first
     _, err = tx.Exec("DELETE FROM members_weapons WHERE weapon_id = ?", weaponID)
     if err != nil {
@@ -1003,8 +1010,29 @@ func deleteWeapon(db *sql.DB, weaponID string) error {
         return err
     }
 
+    // If there was an image, delete it from GCS
+    if imageURL.Valid && imageURL.String != "" {
+        // Extract filename from URL
+        // URL format: https://storage.googleapis.com/BUCKET_NAME/filename
+        urlParts := strings.Split(imageURL.String, "/")
+        filename := urlParts[len(urlParts)-1]
+
+        ctx := context.Background()
+        ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+        defer cancel()
+
+        // Delete the object from GCS
+        err = storageClient.Bucket(bucketName).Object(filename).Delete(ctx)
+        if err != nil {
+            // Log the error but don't fail the transaction
+            // The weapon is already deleted from the database
+            fmt.Printf("Warning: Failed to delete image from storage: %v\n", err)
+        }
+    }
+
     return tx.Commit()
 }
+
 
 func deleteGroup(db *sql.DB, groupID string) error {
     tx, err := db.Begin()

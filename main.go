@@ -983,7 +983,6 @@ func updateGroupSize(tx *sql.Tx, groupID int) error {
     return err
 }
 
-
 func deleteWeapon(db *sql.DB, weaponID string) error {
     tx, err := db.Begin()
     if err != nil {
@@ -1013,26 +1012,30 @@ func deleteWeapon(db *sql.DB, weaponID string) error {
     // If there was an image, delete it from GCS
     if imageURL.Valid && imageURL.String != "" {
         // Extract filename from URL
-        // URL format: https://storage.googleapis.com/BUCKET_NAME/filename
+        // URL format: https://storage.googleapis.com/BUCKET_NAME/weapons/filename
         urlParts := strings.Split(imageURL.String, "/")
-        filename := urlParts[len(urlParts)-1]
+        // The object name includes the "weapons/" prefix
+        objectName := strings.Join(urlParts[len(urlParts)-2:], "/")
+        
+        fmt.Printf("Attempting to delete object: %s from bucket: %s\n", objectName, bucketName)
 
         ctx := context.Background()
         ctx, cancel := context.WithTimeout(ctx, time.Second*10)
         defer cancel()
 
         // Delete the object from GCS
-        err = storageClient.Bucket(bucketName).Object(filename).Delete(ctx)
+        err = storageClient.Bucket(bucketName).Object(objectName).Delete(ctx)
         if err != nil {
-            // Log the error but don't fail the transaction
-            // The weapon is already deleted from the database
             fmt.Printf("Warning: Failed to delete image from storage: %v\n", err)
+            fmt.Printf("URL: %s\n", imageURL.String)
+            fmt.Printf("Object name: %s\n", objectName)
+        } else {
+            fmt.Printf("Successfully deleted object: %s\n", objectName)
         }
     }
 
     return tx.Commit()
 }
-
 
 func deleteGroup(db *sql.DB, groupID string) error {
     tx, err := db.Begin()

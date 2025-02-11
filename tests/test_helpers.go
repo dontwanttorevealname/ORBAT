@@ -3,7 +3,6 @@ package tests
 import (
     "database/sql"
     "fmt"
-    "log"
     "os"
     "path/filepath"
     "sort"

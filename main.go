@@ -82,6 +82,7 @@ var (
     db           *sql.DB
     storageClient *storage.Client
     bucketName   string
+    adminPassword = "adminpassword"
 )
 
 func init() {
@@ -159,7 +160,6 @@ func uploadImageToGCS(file io.Reader, filename string) (string, error) {
     return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketName, filename), nil
 }
 
-
 func main() {
     // Ensure database and storage client are closed
     defer func() {
@@ -190,64 +190,119 @@ func main() {
     })
 
     // Handler for weapons list and weapon addition
-    http.HandleFunc("/weapons", func(w http.ResponseWriter, r *http.Request) {
-        if r.Method == "POST" {
-            // Parse multipart form
-            if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB max
-                http.Error(w, err.Error(), http.StatusBadRequest)
-                return
-            }
+	http.HandleFunc("/weapons", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			// Parse multipart form with 10MB max memory
+			if err := r.ParseMultipartForm(10 << 20); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 
-            name := r.FormValue("name")
-            weaponType := r.FormValue("type")
-            caliber := r.FormValue("caliber")
-            
-            var imageURL string
-            
-            // Handle image upload
-            file, header, err := r.FormFile("image")
-            if err == nil {
-                defer file.Close()
-                
-                // Generate unique filename
-                ext := filepath.Ext(header.Filename)
-                filename := fmt.Sprintf("weapons/%s-%d%s", 
-                    strings.ToLower(strings.ReplaceAll(name, " ", "-")),
-                    time.Now().Unix(),
-                    ext)
-                
-                // Upload to GCS
-                imageURL, err = uploadImageToGCS(file, filename)
-                if err != nil {
-                    http.Error(w, err.Error(), http.StatusInternalServerError)
-                    return
-                }
-            }
+			name := r.FormValue("name")
+			weaponType := r.FormValue("type")
+			caliber := r.FormValue("caliber")
+			replace := r.FormValue("replace") == "true"
+			
+			// Check if weapon with this name exists
+			exists, existingID, err := weaponExists(db, name)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 
-            // Insert weapon with image URL
-            _, err = db.Exec(`
-                INSERT INTO weapons (weapon_name, weapon_type, weapon_caliber, image_url)
-                VALUES (?, ?, ?, ?)`, name, weaponType, caliber, imageURL)
-            if err != nil {
-                http.Error(w, err.Error(), http.StatusInternalServerError)
-                return
-            }
+			if exists && !replace {
+				// Return a special status code to indicate name conflict
+				w.WriteHeader(http.StatusConflict)
+				return
+			}
+			
+			var imageURL string
+			// Handle image upload if present
+			file, header, err := r.FormFile("image")
+			if err == nil {
+				defer file.Close()
+				
+				// Create a unique filename using weapon name and timestamp
+				filename := fmt.Sprintf("weapons/%s-%d%s", 
+					strings.ToLower(strings.ReplaceAll(name, " ", "-")),
+					time.Now().Unix(),
+					filepath.Ext(header.Filename))
+				
+				imageURL, err = uploadImageToGCS(file, filename)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			}
 
-            http.Redirect(w, r, "/weapons", http.StatusSeeOther)
-            return
-        }
+			// Begin transaction
+			tx, err := db.Begin()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer tx.Rollback()
 
-        weapons, err := getWeapons(db)
-        if err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-            return
-        }
+			if exists && replace {
+				// Update existing weapon while preserving its ID and all relationships
+				var updateQuery string
+				var params []interface{}
 
-        if err := templates.ExecuteTemplate(w, "weapons.html", weapons); err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-        }
-    })
+				if imageURL != "" {
+					// If new image provided, update all fields including image
+					updateQuery = `
+						UPDATE weapons 
+						SET weapon_type = ?,
+							weapon_caliber = ?,
+							image_url = ?
+						WHERE weapon_id = ?`
+					params = []interface{}{weaponType, caliber, imageURL, existingID}
+				} else {
+					// If no new image, preserve existing image
+					updateQuery = `
+						UPDATE weapons 
+						SET weapon_type = ?,
+							weapon_caliber = ?
+						WHERE weapon_id = ?`
+					params = []interface{}{weaponType, caliber, existingID}
+				}
 
+				_, err = tx.Exec(updateQuery, params...)
+			} else {
+				// Insert new weapon
+				_, err = tx.Exec(`
+					INSERT INTO weapons (weapon_name, weapon_type, weapon_caliber, image_url)
+					VALUES (?, ?, ?, ?)`, 
+					name, weaponType, caliber, imageURL)
+			}
+
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+				return
+			}
+
+			// Commit transaction
+			if err := tx.Commit(); err != nil {
+				http.Error(w, fmt.Sprintf("Failed to commit transaction: %v", err), http.StatusInternalServerError)
+				return
+			}
+
+			http.Redirect(w, r, "/weapons", http.StatusSeeOther)
+			return
+		}
+
+		// GET request - display weapons list
+		weapons, err := getWeapons(db)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to fetch weapons: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		if err := templates.ExecuteTemplate(w, "weapons.html", weapons); err != nil {
+			http.Error(w, fmt.Sprintf("Template error: %v", err), http.StatusInternalServerError)
+			return
+		}
+	})
     // Handler for managing member weapons
     http.HandleFunc("/member/", func(w http.ResponseWriter, r *http.Request) {
         pathParts := strings.Split(r.URL.Path, "/")
@@ -419,6 +474,19 @@ func main() {
         os.Exit(1)
     }
 }
+
+func weaponExists(db *sql.DB, name string) (bool, int, error) {
+    var id int
+    err := db.QueryRow("SELECT weapon_id FROM weapons WHERE weapon_name = ?", name).Scan(&id)
+    if err == sql.ErrNoRows {
+        return false, 0, nil
+    }
+    if err != nil {
+        return false, 0, err
+    }
+    return true, id, nil
+}
+
 
 func getGroups(db *sql.DB) ([]Group, error) {
     rows, err := db.Query("SELECT group_id, group_name, group_size, group_nationality FROM groups")

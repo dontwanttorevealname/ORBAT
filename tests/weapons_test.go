@@ -131,36 +131,47 @@ func TestWeaponCRUD(t *testing.T) {
     })
 }
 
+
 func TestWeaponValidation(t *testing.T) {
     if err := resetTestDB(); err != nil {
         t.Fatal("Failed to reset test database:", err)
     }
 
     t.Run("Required Fields", func(t *testing.T) {
+        // Test missing all required fields
         _, err := testDB.Exec(`
-            INSERT INTO weapons (weapon_id, weapon_name)
-            VALUES (201, 'Incomplete Weapon')
+            INSERT INTO weapons (weapon_id)
+            VALUES (201)
         `)
         if err == nil {
-            t.Fatal("Should require weapon_type and weapon_caliber")
+            t.Fatal("Should require all required fields")
         }
 
-        // Try with missing caliber
+        // Test missing weapon_type
+        _, err = testDB.Exec(`
+            INSERT INTO weapons (weapon_id, weapon_name, weapon_caliber)
+            VALUES (201, 'Test Weapon', '5.56mm')
+        `)
+        if err == nil {
+            t.Fatal("Should require weapon_type")
+        }
+
+        // Test missing weapon_caliber
         _, err = testDB.Exec(`
             INSERT INTO weapons (weapon_id, weapon_name, weapon_type)
-            VALUES (201, 'Incomplete Weapon', 'Test Type')
+            VALUES (201, 'Test Weapon', 'Rifle')
         `)
         if err == nil {
             t.Fatal("Should require weapon_caliber")
         }
 
-        // Try with missing type
+        // Test valid insertion
         _, err = testDB.Exec(`
-            INSERT INTO weapons (weapon_id, weapon_name, weapon_caliber)
-            VALUES (201, 'Incomplete Weapon', '5.56mm')
+            INSERT INTO weapons (weapon_id, weapon_name, weapon_type, weapon_caliber)
+            VALUES (201, 'Test Weapon', 'Rifle', '5.56mm')
         `)
-        if err == nil {
-            t.Fatal("Should require weapon_type")
+        if err != nil {
+            t.Fatal("Should allow insertion with all required fields")
         }
     })
 }

@@ -134,13 +134,14 @@ func TestGroupOperations(t *testing.T) {
     })
 }
 
+
 func TestGroupValidation(t *testing.T) {
     if err := resetTestDB(); err != nil {
         t.Fatal("Failed to reset test database:", err)
     }
 
     t.Run("Prevent Invalid Member Assignments", func(t *testing.T) {
-        // Create test group first
+        // Create valid group and member first
         _, err := testDB.Exec(`
             INSERT INTO groups (group_id, group_name, group_nationality)
             VALUES (200, 'Test Group', 'Test Nation')
@@ -149,7 +150,15 @@ func TestGroupValidation(t *testing.T) {
             t.Fatal("Failed to create test group:", err)
         }
 
-        // Try to associate non-existent member
+        _, err = testDB.Exec(`
+            INSERT INTO members (member_id, member_role, member_rank)
+            VALUES (200, 'Test Role', 'Test Rank')
+        `)
+        if err != nil {
+            t.Fatal("Failed to create test member:", err)
+        }
+
+        // Try to associate with non-existent member
         _, err = testDB.Exec(`
             INSERT INTO group_members (group_id, member_id)
             VALUES (200, 999)
@@ -161,20 +170,48 @@ func TestGroupValidation(t *testing.T) {
         // Try to associate with non-existent group
         _, err = testDB.Exec(`
             INSERT INTO group_members (group_id, member_id)
-            VALUES (999, 1)
+            VALUES (999, 200)
         `)
         if err == nil {
             t.Fatal("Should not allow invalid group_id")
         }
+
+        // Test valid association
+        _, err = testDB.Exec(`
+            INSERT INTO group_members (group_id, member_id)
+            VALUES (200, 200)
+        `)
+        if err != nil {
+            t.Fatal("Should allow valid group-member association")
+        }
     })
 
     t.Run("Required Fields", func(t *testing.T) {
+        // Test missing group_name
         _, err := testDB.Exec(`
             INSERT INTO groups (group_id, group_nationality)
             VALUES (201, 'Test Nation')
         `)
         if err == nil {
             t.Fatal("Should require group_name")
+        }
+
+        // Test missing nationality
+        _, err = testDB.Exec(`
+            INSERT INTO groups (group_id, group_name)
+            VALUES (201, 'Test Group')
+        `)
+        if err == nil {
+            t.Fatal("Should require group_nationality")
+        }
+
+        // Test valid insertion
+        _, err = testDB.Exec(`
+            INSERT INTO groups (group_id, group_name, group_nationality)
+            VALUES (201, 'Test Group', 'Test Nation')
+        `)
+        if err != nil {
+            t.Fatal("Should allow insertion with all required fields")
         }
     })
 }

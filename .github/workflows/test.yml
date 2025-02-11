@@ -25,11 +25,19 @@ jobs:
       - name: Install sqlite3
         run: sudo apt-get update && sudo apt-get install -y sqlite3
 
-      - name: Create test directories and database
+      - name: Create directories and setup test environment
         run: |
+          mkdir -p tests
           mkdir -p SQL/Database/test
           chmod -R 777 SQL/Database/test
           sqlite3 SQL/Database/test/test.db ".databases"
+
+      - name: Initialize Go module
+        run: |
+          cd tests
+          go mod init orbat/tests
+          go mod tidy
+          go get github.com/mattn/go-sqlite3
 
       - name: Set up mock environment
         run: |
@@ -38,4 +46,6 @@ jobs:
           echo "TESTING=true" >> $GITHUB_ENV
 
       - name: Run tests
-        run: go test ./tests -v
+        run: |
+          cd tests
+          go test -v ./...

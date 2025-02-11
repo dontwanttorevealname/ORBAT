@@ -132,7 +132,7 @@
     <div class="weapon">
         <div class="weapon-info">
             <a href="/weapon/{{.ID}}">{{.Name}}</a> - {{.Type}} ({{.Caliber}})
-            {{if .ImageURL.Valid}}
+            {{if and .ImageURL.Valid .ImageURL.String}}
             <span class="image-indicator">(Has Image)</span>
             {{end}}
         </div>

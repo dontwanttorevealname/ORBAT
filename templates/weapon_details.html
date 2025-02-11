@@ -104,9 +104,9 @@
 
     <h1>{{.Weapon.Name}}</h1>
 
-    {{if .Weapon.ImageURL}}
+    {{if and .Weapon.ImageURL.Valid .Weapon.ImageURL.String}}
     <div class="weapon-image">
-        <img src="{{.Weapon.ImageURL}}" alt="{{.Weapon.Name}}" />
+        <img src="{{.Weapon.ImageURL.String}}" alt="{{.Weapon.Name}}" />
     </div>
     {{end}}
 

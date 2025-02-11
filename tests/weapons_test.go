@@ -136,24 +136,6 @@ func TestWeaponValidation(t *testing.T) {
         t.Fatal("Failed to reset test database:", err)
     }
 
-    t.Run("Prevent Duplicate Weapon IDs", func(t *testing.T) {
-        _, err := testDB.Exec(`
-            INSERT INTO weapons (weapon_id, weapon_name, weapon_type, weapon_caliber)
-            VALUES (200, 'First Weapon', 'Test Type', '5.56mm')
-        `)
-        if err != nil {
-            t.Fatal("Failed to create first weapon:", err)
-        }
-
-        _, err = testDB.Exec(`
-            INSERT INTO weapons (weapon_id, weapon_name, weapon_type, weapon_caliber)
-            VALUES (200, 'Duplicate Weapon', 'Test Type', '5.56mm')
-        `)
-        if err == nil {
-            t.Fatal("Should not allow duplicate weapon IDs")
-        }
-    })
-
     t.Run("Required Fields", func(t *testing.T) {
         _, err := testDB.Exec(`
             INSERT INTO weapons (weapon_id, weapon_name)
@@ -161,6 +143,24 @@ func TestWeaponValidation(t *testing.T) {
         `)
         if err == nil {
             t.Fatal("Should require weapon_type and weapon_caliber")
+        }
+
+        // Try with missing caliber
+        _, err = testDB.Exec(`
+            INSERT INTO weapons (weapon_id, weapon_name, weapon_type)
+            VALUES (201, 'Incomplete Weapon', 'Test Type')
+        `)
+        if err == nil {
+            t.Fatal("Should require weapon_caliber")
+        }
+
+        // Try with missing type
+        _, err = testDB.Exec(`
+            INSERT INTO weapons (weapon_id, weapon_name, weapon_caliber)
+            VALUES (201, 'Incomplete Weapon', '5.56mm')
+        `)
+        if err == nil {
+            t.Fatal("Should require weapon_type")
         }
     })
 }

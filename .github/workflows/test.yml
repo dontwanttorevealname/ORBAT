@@ -1,0 +1,41 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Install goose
+        run: go install github.com/pressly/goose/v3/cmd/goose@latest
+
+      - name: Install sqlite3
+        run: sudo apt-get update && sudo apt-get install -y sqlite3
+
+      - name: Create test directories and database
+        run: |
+          mkdir -p SQL/Database/test
+          chmod -R 777 SQL/Database/test
+          sqlite3 SQL/Database/test/test.db ".databases"
+
+      - name: Set up mock environment
+        run: |
+          echo "DATABASE_URL=file:SQL/Database/test/test.db" >> $GITHUB_ENV
+          echo "GCS_BUCKET_NAME=mock-bucket" >> $GITHUB_ENV
+          echo "TESTING=true" >> $GITHUB_ENV
+
+      - name: Run tests
+        run: go test ./tests -v

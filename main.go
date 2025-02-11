@@ -29,7 +29,7 @@ type Weapon struct {
     Name     string
     Type     string
     Caliber  string
-    ImageURL string
+    ImageURL sql.NullString  // Change from string to sql.NullString
 }
 
 type Member struct {
@@ -197,7 +197,7 @@ func main() {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-
+	
 			name := r.FormValue("name")
 			weaponType := r.FormValue("type")
 			caliber := r.FormValue("caliber")
@@ -209,56 +209,53 @@ func main() {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-
+	
 			if exists && !replace {
 				// Return a special status code to indicate name conflict
 				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte("Weapon with this name already exists"))
 				return
 			}
 			
-			var imageURL string
+			var imageURL sql.NullString
 			// Handle image upload if present
 			file, header, err := r.FormFile("image")
 			if err == nil {
 				defer file.Close()
 				
-				// Create a unique filename using weapon name and timestamp
 				filename := fmt.Sprintf("weapons/%s-%d%s", 
 					strings.ToLower(strings.ReplaceAll(name, " ", "-")),
 					time.Now().Unix(),
 					filepath.Ext(header.Filename))
 				
-				imageURL, err = uploadImageToGCS(file, filename)
+				uploadedURL, err := uploadImageToGCS(file, filename)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
+				imageURL = sql.NullString{String: uploadedURL, Valid: true}
 			}
-
-			// Begin transaction
+	
 			tx, err := db.Begin()
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			defer tx.Rollback()
-
+	
 			if exists && replace {
-				// Update existing weapon while preserving its ID and all relationships
 				var updateQuery string
 				var params []interface{}
-
-				if imageURL != "" {
-					// If new image provided, update all fields including image
+	
+				if imageURL.Valid {
 					updateQuery = `
 						UPDATE weapons 
 						SET weapon_type = ?,
 							weapon_caliber = ?,
 							image_url = ?
 						WHERE weapon_id = ?`
-					params = []interface{}{weaponType, caliber, imageURL, existingID}
+					params = []interface{}{weaponType, caliber, imageURL.String, existingID}
 				} else {
-					// If no new image, preserve existing image
 					updateQuery = `
 						UPDATE weapons 
 						SET weapon_type = ?,
@@ -266,38 +263,36 @@ func main() {
 						WHERE weapon_id = ?`
 					params = []interface{}{weaponType, caliber, existingID}
 				}
-
+	
 				_, err = tx.Exec(updateQuery, params...)
 			} else {
-				// Insert new weapon
 				_, err = tx.Exec(`
 					INSERT INTO weapons (weapon_name, weapon_type, weapon_caliber, image_url)
 					VALUES (?, ?, ?, ?)`, 
 					name, weaponType, caliber, imageURL)
 			}
-
+	
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
 				return
 			}
-
-			// Commit transaction
+	
 			if err := tx.Commit(); err != nil {
 				http.Error(w, fmt.Sprintf("Failed to commit transaction: %v", err), http.StatusInternalServerError)
 				return
 			}
-
+	
 			http.Redirect(w, r, "/weapons", http.StatusSeeOther)
 			return
 		}
-
-		// GET request - display weapons list
+	
+		// GET request handling remains the same
 		weapons, err := getWeapons(db)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to fetch weapons: %v", err), http.StatusInternalServerError)
 			return
 		}
-
+	
 		if err := templates.ExecuteTemplate(w, "weapons.html", weapons); err != nil {
 			http.Error(w, fmt.Sprintf("Template error: %v", err), http.StatusInternalServerError)
 			return
@@ -507,7 +502,7 @@ func getGroups(db *sql.DB) ([]Group, error) {
 }
 
 func getWeapons(db *sql.DB) ([]Weapon, error) {
-    rows, err := db.Query("SELECT weapon_id, weapon_name, weapon_type, weapon_caliber FROM weapons ORDER BY weapon_name")
+    rows, err := db.Query("SELECT weapon_id, weapon_name, weapon_type, weapon_caliber, image_url FROM weapons ORDER BY weapon_name")
     if err != nil {
         return nil, err
     }
@@ -516,7 +511,7 @@ func getWeapons(db *sql.DB) ([]Weapon, error) {
     var weapons []Weapon
     for rows.Next() {
         var w Weapon
-        if err := rows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber); err != nil {
+        if err := rows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber, &w.ImageURL); err != nil {
             return nil, err
         }
         weapons = append(weapons, w)

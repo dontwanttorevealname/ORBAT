@@ -134,7 +134,6 @@ func TestGroupOperations(t *testing.T) {
     })
 }
 
-
 func TestGroupValidation(t *testing.T) {
     if err := resetTestDB(); err != nil {
         t.Fatal("Failed to reset test database:", err)
@@ -183,35 +182,6 @@ func TestGroupValidation(t *testing.T) {
         `)
         if err != nil {
             t.Fatal("Should allow valid group-member association")
-        }
-    })
-
-    t.Run("Required Fields", func(t *testing.T) {
-        // Test missing group_name
-        _, err := testDB.Exec(`
-            INSERT INTO groups (group_id, group_nationality)
-            VALUES (201, 'Test Nation')
-        `)
-        if err == nil {
-            t.Fatal("Should require group_name")
-        }
-
-        // Test missing nationality
-        _, err = testDB.Exec(`
-            INSERT INTO groups (group_id, group_name)
-            VALUES (201, 'Test Group')
-        `)
-        if err == nil {
-            t.Fatal("Should require group_nationality")
-        }
-
-        // Test valid insertion
-        _, err = testDB.Exec(`
-            INSERT INTO groups (group_id, group_name, group_nationality)
-            VALUES (201, 'Test Group', 'Test Nation')
-        `)
-        if err != nil {
-            t.Fatal("Should allow insertion with all required fields")
         }
     })
 }

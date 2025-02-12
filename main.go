@@ -76,6 +76,34 @@ type WeaponDetails struct {
     Countries    []string
 }
 
+type Vehicle struct {
+    ID        int
+    Name      string
+    Type      string
+    Armament  string
+    ImageURL  sql.NullString
+}
+
+type VehicleDetails struct {
+    Vehicle   Vehicle
+    Groups    []VehicleGroupUsers
+    TotalUsers int
+    CountryCount int
+    Countries []string
+}
+
+type VehicleGroupUsers struct {
+    GroupID     int
+    GroupName   string
+    Nationality string
+    Members     []VehicleMember
+}
+
+type VehicleMember struct {
+    Role    string
+    Rank    string
+}
+
 
 var (
     templates     *template.Template
@@ -298,6 +326,155 @@ func main() {
 			return
 		}
 	})
+
+
+    // Handler for vehicles list
+    http.HandleFunc("/vehicles", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" {
+            if err := r.ParseMultipartForm(10 << 20); err != nil {
+                http.Error(w, err.Error(), http.StatusBadRequest)
+                return
+            }
+
+            name := r.FormValue("name")
+            vehicleType := r.FormValue("type")
+            armament := r.FormValue("armament")
+            if armament == "" {
+                armament = "None"
+            }
+
+            // Check for duplicate names
+            var exists bool
+            err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM vehicles WHERE vehicle_name = ?)", name).Scan(&exists)
+            if err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            if exists && r.FormValue("replace") != "true" {
+                w.WriteHeader(http.StatusConflict)
+                return
+            }
+
+            tx, err := db.Begin()
+            if err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+            defer tx.Rollback()
+
+            var vehicleID int64
+            if exists {
+                // Update existing vehicle
+                _, err = tx.Exec(`
+                    UPDATE vehicles 
+                    SET vehicle_type = ?, vehicle_armament = ?
+                    WHERE vehicle_name = ?`,
+                    vehicleType, armament, name)
+                if err != nil {
+                    http.Error(w, err.Error(), http.StatusInternalServerError)
+                    return
+                }
+
+                err = tx.QueryRow("SELECT vehicle_id FROM vehicles WHERE vehicle_name = ?", name).Scan(&vehicleID)
+                if err != nil {
+                    http.Error(w, err.Error(), http.StatusInternalServerError)
+                    return
+                }
+            } else {
+                // Insert new vehicle
+                result, err := tx.Exec(`
+                    INSERT INTO vehicles (vehicle_name, vehicle_type, vehicle_armament)
+                    VALUES (?, ?, ?)`,
+                    name, vehicleType, armament)
+                if err != nil {
+                    http.Error(w, err.Error(), http.StatusInternalServerError)
+                    return
+                }
+
+                vehicleID, err = result.LastInsertId()
+                if err != nil {
+                    http.Error(w, err.Error(), http.StatusInternalServerError)
+                    return
+                }
+            }
+
+            // Handle image upload
+            file, header, err := r.FormFile("image")
+            if err == nil {
+                defer file.Close()
+
+                // Upload image to GCS
+                filename := fmt.Sprintf("vehicles/%d_%s", vehicleID, header.Filename)
+                imageURL, err := uploadImageToGCS(file, filename)
+                if err != nil {
+                    http.Error(w, err.Error(), http.StatusInternalServerError)
+                    return
+                }
+
+                // Update vehicle with image URL
+                _, err = tx.Exec("UPDATE vehicles SET image_url = ? WHERE vehicle_id = ?", imageURL, vehicleID)
+                if err != nil {
+                    http.Error(w, err.Error(), http.StatusInternalServerError)
+                    return
+                }
+            }
+
+            if err := tx.Commit(); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            http.Redirect(w, r, "/vehicles", http.StatusSeeOther)
+            return
+        }
+
+        vehicles, err := getVehicles(db)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        if err := templates.ExecuteTemplate(w, "vehicles.html", vehicles); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+    })
+
+    // Handler for vehicle details
+    http.HandleFunc("/vehicle/", func(w http.ResponseWriter, r *http.Request) {
+        pathParts := strings.Split(r.URL.Path, "/")
+        if len(pathParts) < 3 {
+            http.NotFound(w, r)
+            return
+        }
+
+        id := pathParts[2]
+        if len(pathParts) == 4 && pathParts[3] == "delete" {
+            if r.Method != "POST" {
+                http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+                return
+            }
+
+            if err := deleteVehicle(db, id); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            http.Redirect(w, r, "/vehicles", http.StatusSeeOther)
+            return
+        }
+
+        details, err := getVehicleDetails(db, id)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        if err := templates.ExecuteTemplate(w, "vehicle_details.html", details); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+    })
+
     // Handler for managing member weapons
     http.HandleFunc("/member/", func(w http.ResponseWriter, r *http.Request) {
         pathParts := strings.Split(r.URL.Path, "/")
@@ -1213,6 +1390,142 @@ func updateMemberWeapons(db *sql.DB, memberID string, weaponIDs []string) error 
             "INSERT INTO members_weapons (member_id, weapon_id) VALUES (?, ?)",
             memberID, weaponID)
         if err != nil {
+            return err
+        }
+    }
+
+    return tx.Commit()
+}
+
+func getVehicles(db *sql.DB) ([]Vehicle, error) {
+    rows, err := db.Query("SELECT vehicle_id, vehicle_name, vehicle_type, vehicle_armament, image_url FROM vehicles ORDER BY vehicle_name")
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var vehicles []Vehicle
+    for rows.Next() {
+        var v Vehicle
+        if err := rows.Scan(&v.ID, &v.Name, &v.Type, &v.Armament, &v.ImageURL); err != nil {
+            return nil, err
+        }
+        vehicles = append(vehicles, v)
+    }
+    return vehicles, nil
+}
+
+func getVehicleDetails(db *sql.DB, vehicleID string) (VehicleDetails, error) {
+    var details VehicleDetails
+
+    err := db.QueryRow(`
+        SELECT vehicle_id, vehicle_name, vehicle_type, vehicle_armament, image_url 
+        FROM vehicles WHERE vehicle_id = ?`, vehicleID).Scan(
+        &details.Vehicle.ID, &details.Vehicle.Name, &details.Vehicle.Type, 
+        &details.Vehicle.Armament, &details.Vehicle.ImageURL)
+    if err != nil {
+        return details, err
+    }
+
+    rows, err := db.Query(`
+        SELECT 
+            g.group_id,
+            g.group_name,
+            g.group_nationality,
+            m.member_role,
+            m.member_rank
+        FROM vehicle_members vm
+        JOIN members m ON vm.member_id = m.member_id
+        JOIN group_vehicles gv ON vm.vehicle_id = gv.vehicle_id
+        JOIN groups g ON gv.group_id = g.group_id
+        WHERE vm.vehicle_id = ?
+        ORDER BY g.group_name`, vehicleID)
+    if err != nil {
+        return details, err
+    }
+    defer rows.Close()
+
+    groupMap := make(map[int]*VehicleGroupUsers)
+    countryMap := make(map[string]bool)
+    userCount := 0
+
+    for rows.Next() {
+        var groupID int
+        var groupName, nationality, role, rank string
+
+        err := rows.Scan(&groupID, &groupName, &nationality, &role, &rank)
+        if err != nil {
+            return details, err
+        }
+
+        countryMap[nationality] = true
+        userCount++
+
+        member := VehicleMember{
+            Role: role,
+            Rank: rank,
+        }
+
+        if group, exists := groupMap[groupID]; exists {
+            group.Members = append(group.Members, member)
+        } else {
+            groupMap[groupID] = &VehicleGroupUsers{
+                GroupID:     groupID,
+                GroupName:   groupName,
+                Nationality: nationality,
+                Members:     []VehicleMember{member},
+            }
+        }
+    }
+
+    details.TotalUsers = userCount
+    details.CountryCount = len(countryMap)
+    
+    for country := range countryMap {
+        details.Countries = append(details.Countries, country)
+    }
+
+    for _, group := range groupMap {
+        details.Groups = append(details.Groups, *group)
+    }
+
+    return details, nil
+}
+
+func deleteVehicle(db *sql.DB, vehicleID string) error {
+    tx, err := db.Begin()
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    // Get the image URL before deleting the vehicle
+    var imageURL sql.NullString
+    err = tx.QueryRow("SELECT image_url FROM vehicles WHERE vehicle_id = ?", vehicleID).Scan(&imageURL)
+    if err != nil {
+        return err
+    }
+
+    // Delete vehicle associations first
+    _, err = tx.Exec("DELETE FROM vehicle_members WHERE vehicle_id = ?", vehicleID)
+    if err != nil {
+        return err
+    }
+
+    _, err = tx.Exec("DELETE FROM group_vehicles WHERE vehicle_id = ?", vehicleID)
+    if err != nil {
+        return err
+    }
+
+    // Delete the vehicle
+    _, err = tx.Exec("DELETE FROM vehicles WHERE vehicle_id = ?", vehicleID)
+    if err != nil {
+        return err
+    }
+
+    // Delete image from GCS if it exists
+    if imageURL.Valid && imageURL.String != "" {
+        if err := deleteImageFromGCS(imageURL.String); err != nil {
             return err
         }
     }

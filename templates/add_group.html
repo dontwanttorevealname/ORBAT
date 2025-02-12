@@ -16,7 +16,7 @@
             border-radius: 4px;
             background: #f5f5f5;
         }
-        .member-form, .team-form {
+        .member-form, .team-form, .vehicle-form {
             margin: 10px 0;
             padding: 10px;
             border: 1px solid #ccc;
@@ -71,6 +71,16 @@
         .nav a:hover {
             text-decoration: underline;
         }
+        .vehicle-crew {
+            margin-left: 20px;
+            padding: 10px;
+            border-left: 2px solid #eee;
+        }
+        .team-members {
+            margin-left: 20px;
+            padding: 10px;
+            border-left: 2px solid #eee;
+        }
     </style>
 </head>
 <body>
@@ -104,89 +114,49 @@
             <button type="button" onclick="addTeam()">Add Team</button>
         </div>
 
+        <div class="section">
+            <h2>Vehicles</h2>
+            <div id="vehicles"></div>
+            <button type="button" onclick="addVehicle()">Add Vehicle</button>
+        </div>
+
         <button type="submit">Create Group</button>
     </form>
 
     <script>
         let weaponOptions = {{.WeaponOptions}};
-
-        function createWeaponSelect(memberIndex, teamIndex) {
-            let select = document.createElement('select');
-            // Create unique name for weapon select based on member location
-            let selectName = teamIndex !== undefined 
-                ? `team_${teamIndex}_weapons_${memberIndex}[]`
-                : `weapons_${memberIndex}[]`;
-            select.name = selectName;
-            select.required = true;
-            weaponOptions.forEach(weapon => {
-                let option = document.createElement('option');
-                option.value = weapon.ID;
-                option.textContent = `${weapon.Name} (${weapon.Type}, ${weapon.Caliber})`;
-                select.appendChild(option);
-            });
-            return select;
-        }
+        let vehicleOptions = {{.VehicleOptions}};
 
         function addMember(containerId) {
             let container = document.getElementById(containerId);
             let memberDiv = document.createElement('div');
             memberDiv.className = 'member-form';
             
-            // Get indices for naming
-            let isTeamMember = containerId.startsWith('team_');
-            let teamIndex = isTeamMember ? parseInt(containerId.split('_')[1]) : undefined;
             let memberIndex = container.children.length;
-            let namePrefix = isTeamMember ? `team_${teamIndex}` : 'directMembers';
+            let namePrefix = containerId === 'directMembers' ? '' : `team_${container.dataset.teamIndex}_`;
             
             memberDiv.innerHTML = `
                 <div class="form-group">
                     <label>Role:</label>
-                    <input type="text" name="${namePrefix}_role[]" required>
+                    <input type="text" name="${namePrefix}role[]" required>
                 </div>
                 <div class="form-group">
                     <label>Rank:</label>
-                    <input type="text" name="${namePrefix}_rank[]" required>
+                    <input type="text" name="${namePrefix}rank[]" required>
                 </div>
                 <div class="form-group">
                     <label>Weapons:</label>
                     <div class="weapon-selects"></div>
-                    <button type="button" onclick="addWeaponSelect(this)">Add Weapon</button>
+                    <button type="button" onclick="addWeaponSelect(this, '${namePrefix}weapons_${memberIndex}')">Add Weapon</button>
                 </div>
                 <button type="button" class="remove" onclick="this.parentElement.remove()">Remove Member</button>
             `;
-
+            
             container.appendChild(memberDiv);
             
-            // Store indices as data attributes
-            memberDiv.dataset.memberIndex = memberIndex;
-            if (teamIndex !== undefined) {
-                memberDiv.dataset.teamIndex = teamIndex;
-            }
-            
-            addWeaponSelect(memberDiv.querySelector('button'));
-        }
-
-        function addWeaponSelect(buttonElement) {
-            let memberDiv = buttonElement.closest('.member-form');
-            let container = buttonElement.parentElement.querySelector('.weapon-selects');
-            let weaponDiv = document.createElement('div');
-            weaponDiv.className = 'weapon-select';
-            
-            // Get indices from data attributes
-            let memberIndex = parseInt(memberDiv.dataset.memberIndex);
-            let teamIndex = memberDiv.dataset.teamIndex !== undefined 
-                ? parseInt(memberDiv.dataset.teamIndex) 
-                : undefined;
-            
-            weaponDiv.appendChild(createWeaponSelect(memberIndex, teamIndex));
-            
-            let removeButton = document.createElement('button');
-            removeButton.type = 'button';
-            removeButton.className = 'remove';
-            removeButton.textContent = 'Remove';
-            removeButton.onclick = () => weaponDiv.remove();
-            weaponDiv.appendChild(removeButton);
-            container.appendChild(weaponDiv);
+            // Add initial weapon select
+            let weaponButton = memberDiv.querySelector('button');
+            addWeaponSelect(weaponButton, `${namePrefix}weapons_${memberIndex}`);
         }
 
         function addTeam() {
@@ -195,19 +165,103 @@
             let teamDiv = document.createElement('div');
             teamDiv.className = 'section';
             
-            let teamMembersId = `team_${teamIndex}`;
-            
             teamDiv.innerHTML = `
                 <div class="form-group">
                     <label>Team Name:</label>
                     <input type="text" name="team_name[]" required>
                 </div>
-                <div id="${teamMembersId}" class="team-members"></div>
-                <button type="button" onclick="addMember('${teamMembersId}')">Add Team Member</button>
+                <div class="team-members" id="team_${teamIndex}_members" data-team-index="${teamIndex}"></div>
+                <button type="button" onclick="addMember('team_${teamIndex}_members')">Add Team Member</button>
                 <button type="button" class="remove" onclick="this.parentElement.remove()">Remove Team</button>
             `;
             
             container.appendChild(teamDiv);
+        }
+
+        function addVehicle() {
+            let container = document.getElementById('vehicles');
+            let vehicleIndex = container.children.length;
+            
+            let vehicleDiv = document.createElement('div');
+            vehicleDiv.className = 'vehicle-form';
+            
+            vehicleDiv.innerHTML = `
+                <div class="form-group">
+                    <label>Vehicle:</label>
+                    <select name="vehicle_id[]" required>
+                        ${vehicleOptions.map(v => 
+                            `<option value="${v.ID}">${v.Name} (${v.Type})</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="vehicle-crew">
+                    <h4>Crew Members</h4>
+                    <div id="vehicle_${vehicleIndex}_members"></div>
+                    <button type="button" onclick="addVehicleMember(${vehicleIndex})">Add Crew Member</button>
+                </div>
+                <button type="button" class="remove" onclick="this.parentElement.remove()">Remove Vehicle</button>
+            `;
+            
+            container.appendChild(vehicleDiv);
+        }
+
+        function addVehicleMember(vehicleIndex) {
+            let container = document.getElementById(`vehicle_${vehicleIndex}_members`);
+            let memberIndex = container.children.length;
+            
+            let memberDiv = document.createElement('div');
+            memberDiv.className = 'member-form';
+            
+            memberDiv.innerHTML = `
+                <div class="form-group">
+                    <label>Role:</label>
+                    <input type="text" name="vehicle_${vehicleIndex}_role[]" required>
+                </div>
+                <div class="form-group">
+                    <label>Rank:</label>
+                    <input type="text" name="vehicle_${vehicleIndex}_rank[]" required>
+                </div>
+                <div class="form-group">
+                    <label>Weapons:</label>
+                    <div class="weapon-selects"></div>
+                    <button type="button" onclick="addWeaponSelect(this, 'vehicle_${vehicleIndex}_weapons_${memberIndex}')">Add Weapon</button>
+                </div>
+                <button type="button" class="remove" onclick="this.parentElement.remove()">Remove Member</button>
+            `;
+            
+            container.appendChild(memberDiv);
+            
+            // Add initial weapon select
+            let weaponButton = memberDiv.querySelector('button');
+            addWeaponSelect(weaponButton, `vehicle_${vehicleIndex}_weapons_${memberIndex}`);
+        }
+
+        function addWeaponSelect(buttonElement, namePrefix) {
+            let container = buttonElement.parentElement.querySelector('.weapon-selects');
+            let weaponDiv = document.createElement('div');
+            weaponDiv.className = 'weapon-select';
+            
+            let select = document.createElement('select');
+            select.name = namePrefix ? `${namePrefix}[]` : 'weapons[]';
+            select.required = true;
+            
+            weaponOptions.forEach(weapon => {
+                let option = document.createElement('option');
+                option.value = weapon.ID;
+                option.textContent = `${weapon.Name} (${weapon.Type}, ${weapon.Caliber})`;
+                select.appendChild(option);
+            });
+            
+            weaponDiv.appendChild(select);
+            
+            let removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'remove';
+            removeButton.textContent = 'Remove';
+            removeButton.onclick = () => weaponDiv.remove();
+            
+            weaponDiv.appendChild(removeButton);
+            container.appendChild(weaponDiv);
         }
     </script>
 </body>

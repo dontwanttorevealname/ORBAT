@@ -1659,14 +1659,103 @@ func deleteGroup(db *sql.DB, groupID string) error {
         }
     }
 
+    // Check for errors from iterating over rows
+    if err = rows.Err(); err != nil {
+        return err
+    }
+
     // Delete group vehicles
     _, err = tx.Exec("DELETE FROM group_vehicles WHERE group_id = ?", groupID)
     if err != nil {
         return err
     }
 
-    // ... rest of delete logic ...
+    // Get all team IDs for this group
+    rows, err = tx.Query(`
+        SELECT team_id 
+        FROM group_members 
+        WHERE group_id = ? AND team_id IS NOT NULL`, groupID)
+    if err != nil {
+        return err
+    }
+    defer rows.Close()
+
+    // Delete team members for each team
+    for rows.Next() {
+        var teamID int
+        if err := rows.Scan(&teamID); err != nil {
+            return err
+        }
+
+        // Delete weapons for team members
+        _, err = tx.Exec(`
+            DELETE FROM members_weapons 
+            WHERE member_id IN (
+                SELECT member_id 
+                FROM team_members 
+                WHERE team_id = ?
+            )`, teamID)
+        if err != nil {
+            return err
+        }
+
+        // Delete team members
+        _, err = tx.Exec("DELETE FROM team_members WHERE team_id = ?", teamID)
+        if err != nil {
+            return err
+        }
+
+        // Delete team
+        _, err = tx.Exec("DELETE FROM teams WHERE team_id = ?", teamID)
+        if err != nil {
+            return err
+        }
+    }
+
+    // Check for errors from iterating over rows
+    if err = rows.Err(); err != nil {
+        return err
+    }
+
+    // Delete weapons for direct members
+    _, err = tx.Exec(`
+        DELETE FROM members_weapons 
+        WHERE member_id IN (
+            SELECT member_id 
+            FROM group_members 
+            WHERE group_id = ? AND team_id IS NULL
+        )`, groupID)
+    if err != nil {
+        return err
+    }
+
+    // Delete direct members
+    _, err = tx.Exec(`
+        DELETE FROM members 
+        WHERE member_id IN (
+            SELECT member_id 
+            FROM group_members 
+            WHERE group_id = ? AND team_id IS NULL
+        )`, groupID)
+    if err != nil {
+        return err
+    }
+
+    // Delete group members
+    _, err = tx.Exec("DELETE FROM group_members WHERE group_id = ?", groupID)
+    if err != nil {
+        return err
+    }
+
+    // Finally, delete the group itself
+    _, err = tx.Exec("DELETE FROM groups WHERE group_id = ?", groupID)
+    if err != nil {
+        return err
+    }
+
+    return tx.Commit()
 }
+
 
 func getMemberWeaponsData(db *sql.DB, memberID string) (map[string]interface{}, error) {
     // Get all available weapons

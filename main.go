@@ -759,65 +759,71 @@ func main() {
                 }
             }
     
-            // Handle vehicles
-            vehicleIDs := r.PostForm["vehicle_id[]"]
-            for i, vehicleID := range vehicleIDs {
-                // Associate vehicle with group
-                _, err = tx.Exec(`
-                    INSERT INTO group_vehicles (group_id, vehicle_id)
+        // Handle vehicles
+        vehicleIDs := r.PostForm["vehicle_id[]"]
+        for i, vehicleID := range vehicleIDs {
+            // Insert vehicle instance
+            result, err := tx.Exec(`
+                INSERT INTO group_vehicles (group_id, vehicle_id)
+                VALUES (?, ?)
+            `, groupID, vehicleID)
+            if err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            instanceID, err := result.LastInsertId()
+            if err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            // Handle vehicle members
+            vehicleRoles := r.PostForm[fmt.Sprintf("vehicle_%d_role[]", i)]
+            vehicleRanks := r.PostForm[fmt.Sprintf("vehicle_%d_rank[]", i)]
+            totalMembers += len(vehicleRoles)
+            
+            for j := range vehicleRoles {
+                // Insert member
+                result, err := tx.Exec(`
+                    INSERT INTO members (member_role, member_rank)
                     VALUES (?, ?)
-                `, groupID, vehicleID)
+                `, vehicleRoles[j], vehicleRanks[j])
                 if err != nil {
                     http.Error(w, err.Error(), http.StatusInternalServerError)
                     return
                 }
-    
-                // Handle vehicle members
-                vehicleRoles := r.PostForm[fmt.Sprintf("vehicle_%d_role[]", i)]
-                vehicleRanks := r.PostForm[fmt.Sprintf("vehicle_%d_rank[]", i)]
-                totalMembers += len(vehicleRoles)
-                
-                for j := range vehicleRoles {
-                    // Insert member
-                    result, err := tx.Exec(`
-                        INSERT INTO members (member_role, member_rank)
-                        VALUES (?, ?)
-                    `, vehicleRoles[j], vehicleRanks[j])
-                    if err != nil {
-                        http.Error(w, err.Error(), http.StatusInternalServerError)
-                        return
-                    }
-    
-                    memberID, err := result.LastInsertId()
-                    if err != nil {
-                        http.Error(w, err.Error(), http.StatusInternalServerError)
-                        return
-                    }
-    
-                    // Associate member with vehicle
+
+                memberID, err := result.LastInsertId()
+                if err != nil {
+                    http.Error(w, err.Error(), http.StatusInternalServerError)
+                    return
+                }
+
+                // Associate member with vehicle instance
+                _, err = tx.Exec(`
+                    INSERT INTO vehicle_members (instance_id, member_id)
+                    VALUES (?, ?)
+                `, instanceID, memberID)
+                if err != nil {
+                    http.Error(w, err.Error(), http.StatusInternalServerError)
+                    return
+                }
+
+                // Handle weapons for this vehicle member
+                weaponIDs := r.PostForm[fmt.Sprintf("vehicle_%d_weapons_%d[]", i, j)]
+                for _, weaponID := range weaponIDs {
                     _, err = tx.Exec(`
-                        INSERT INTO vehicle_members (vehicle_id, member_id)
+                        INSERT INTO members_weapons (member_id, weapon_id)
                         VALUES (?, ?)
-                    `, vehicleID, memberID)
+                    `, memberID, weaponID)
                     if err != nil {
                         http.Error(w, err.Error(), http.StatusInternalServerError)
                         return
-                    }
-    
-                    // Handle weapons for this vehicle member
-                    weaponIDs := r.PostForm[fmt.Sprintf("vehicle_%d_weapons_%d[]", i, j)]
-                    for _, weaponID := range weaponIDs {
-                        _, err = tx.Exec(`
-                            INSERT INTO members_weapons (member_id, weapon_id)
-                            VALUES (?, ?)
-                        `, memberID, weaponID)
-                        if err != nil {
-                            http.Error(w, err.Error(), http.StatusInternalServerError)
-                            return
-                        }
                     }
                 }
             }
+        }
     
             // Update group size
             _, err = tx.Exec("UPDATE groups SET group_size = ? WHERE group_id = ?", totalMembers, groupID)

@@ -888,7 +888,17 @@ func weaponExists(db *sql.DB, name string) (bool, int, error) {
 
 
 func getGroups(db *sql.DB) ([]Group, error) {
-    rows, err := db.Query("SELECT group_id, group_name, group_size, group_nationality FROM groups")
+    rows, err := db.Query(`
+        SELECT 
+            g.group_id,
+            g.group_name,
+            g.group_nationality,
+            g.group_size,
+            COUNT(DISTINCT gm.member_id) as actual_size
+        FROM groups g
+        LEFT JOIN group_members gm ON g.group_id = gm.group_id
+        GROUP BY g.group_id, g.group_name, g.group_nationality, g.group_size
+        ORDER BY g.group_name`)
     if err != nil {
         return nil, err
     }
@@ -897,11 +907,16 @@ func getGroups(db *sql.DB) ([]Group, error) {
     var groups []Group
     for rows.Next() {
         var g Group
-        if err := rows.Scan(&g.ID, &g.Name, &g.Size, &g.Nationality); err != nil {
+        if err := rows.Scan(&g.ID, &g.Name, &g.Nationality, &g.Size, &g.ActualSize); err != nil {
             return nil, err
         }
         groups = append(groups, g)
     }
+
+    if err = rows.Err(); err != nil {
+        return nil, err
+    }
+
     return groups, nil
 }
 
@@ -1632,163 +1647,128 @@ func deleteWeapon(db *sql.DB, weaponID string) error {
     return tx.Commit()
 }
 
-
 func deleteGroup(db *sql.DB, groupID string) error {
     tx, err := db.Begin()
     if err != nil {
-        return err
+        return fmt.Errorf("failed to begin transaction: %v", err)
     }
     defer tx.Rollback()
 
-    // Get all vehicle instances for this group
-    rows, err := tx.Query("SELECT instance_id FROM group_vehicles WHERE group_id = ?", groupID)
-    if err != nil {
-        return err
-    }
-    defer rows.Close()
-
-    // Delete vehicle members and their weapons for each instance
-    for rows.Next() {
-        var instanceID int
-        if err := rows.Scan(&instanceID); err != nil {
-            return err
-        }
-
-        // First delete weapons for vehicle members
-        _, err = tx.Exec(`
-            DELETE FROM members_weapons 
-            WHERE member_id IN (
-                SELECT member_id 
-                FROM vehicle_members 
-                WHERE instance_id = ?
-            )`, instanceID)
-        if err != nil {
-            return err
-        }
-
-        // Delete the members themselves
-        _, err = tx.Exec(`
-            DELETE FROM members 
-            WHERE member_id IN (
-                SELECT member_id 
-                FROM vehicle_members 
-                WHERE instance_id = ?
-            )`, instanceID)
-        if err != nil {
-            return err
-        }
-        
-        // Now delete vehicle members
-        _, err = tx.Exec("DELETE FROM vehicle_members WHERE instance_id = ?", instanceID)
-        if err != nil {
-            return err
-        }
-    }
-
-    // Check for errors from iterating over rows
-    if err = rows.Err(); err != nil {
-        return err
-    }
-
-    // Delete group vehicles
-    _, err = tx.Exec("DELETE FROM group_vehicles WHERE group_id = ?", groupID)
-    if err != nil {
-        return err
-    }
-
-    // Get all team IDs for this group
-    rows, err = tx.Query(`
-        SELECT team_id 
-        FROM group_members 
-        WHERE group_id = ? AND team_id IS NOT NULL`, groupID)
-    if err != nil {
-        return err
-    }
-    defer rows.Close()
-
-    // Delete team members for each team
-    for rows.Next() {
-        var teamID int
-        if err := rows.Scan(&teamID); err != nil {
-            return err
-        }
-
-        // Delete weapons for team members
-        _, err = tx.Exec(`
-            DELETE FROM members_weapons 
-            WHERE member_id IN (
-                SELECT member_id 
-                FROM team_members 
-                WHERE team_id = ?
-            )`, teamID)
-        if err != nil {
-            return err
-        }
-
-        // Delete the members themselves
-        _, err = tx.Exec(`
-            DELETE FROM members 
-            WHERE member_id IN (
-                SELECT member_id 
-                FROM team_members 
-                WHERE team_id = ?
-            )`, teamID)
-        if err != nil {
-            return err
-        }
-
-        // Delete team members
-        _, err = tx.Exec("DELETE FROM team_members WHERE team_id = ?", teamID)
-        if err != nil {
-            return err
-        }
-
-        // Delete team
-        _, err = tx.Exec("DELETE FROM teams WHERE team_id = ?", teamID)
-        if err != nil {
-            return err
-        }
-    }
-
-    // Check for errors from iterating over rows
-    if err = rows.Err(); err != nil {
-        return err
-    }
-
-    // Delete weapons for direct members
+    // First delete all weapons for any member in the group (direct members, team members, and vehicle members)
     _, err = tx.Exec(`
         DELETE FROM members_weapons 
         WHERE member_id IN (
-            SELECT member_id 
-            FROM group_members 
-            WHERE group_id = ? AND team_id IS NULL
-        )`, groupID)
+            -- Direct members
+            SELECT m.member_id 
+            FROM members m
+            JOIN group_members gm ON m.member_id = gm.member_id
+            WHERE gm.group_id = ?
+            UNION
+            -- Team members
+            SELECT m.member_id
+            FROM members m
+            JOIN team_members tm ON m.member_id = tm.member_id
+            JOIN teams t ON tm.team_id = t.team_id
+            JOIN group_members gm ON t.team_id = gm.team_id
+            WHERE gm.group_id = ?
+            UNION
+            -- Vehicle members
+            SELECT m.member_id
+            FROM members m
+            JOIN vehicle_members vm ON m.member_id = vm.member_id
+            JOIN group_vehicles gv ON vm.instance_id = gv.instance_id
+            WHERE gv.group_id = ?
+        )
+    `, groupID, groupID, groupID)
     if err != nil {
-        return err
+        return fmt.Errorf("failed to delete member weapons: %v", err)
     }
 
-    // Delete direct members
+    // Delete all members in the group
     _, err = tx.Exec(`
         DELETE FROM members 
         WHERE member_id IN (
-            SELECT member_id 
-            FROM group_members 
-            WHERE group_id = ? AND team_id IS NULL
-        )`, groupID)
+            -- Direct members
+            SELECT m.member_id 
+            FROM members m
+            JOIN group_members gm ON m.member_id = gm.member_id
+            WHERE gm.group_id = ?
+            UNION
+            -- Team members
+            SELECT m.member_id
+            FROM members m
+            JOIN team_members tm ON m.member_id = tm.member_id
+            JOIN teams t ON tm.team_id = t.team_id
+            JOIN group_members gm ON t.team_id = gm.team_id
+            WHERE gm.group_id = ?
+            UNION
+            -- Vehicle members
+            SELECT m.member_id
+            FROM members m
+            JOIN vehicle_members vm ON m.member_id = vm.member_id
+            JOIN group_vehicles gv ON vm.instance_id = gv.instance_id
+            WHERE gv.group_id = ?
+        )
+    `, groupID, groupID, groupID)
     if err != nil {
-        return err
+        return fmt.Errorf("failed to delete members: %v", err)
     }
 
-    // Delete group members
+    // Delete vehicle_members associations
+    _, err = tx.Exec(`
+        DELETE FROM vehicle_members 
+        WHERE instance_id IN (
+            SELECT instance_id 
+            FROM group_vehicles 
+            WHERE group_id = ?
+        )
+    `, groupID)
+    if err != nil {
+        return fmt.Errorf("failed to delete vehicle members: %v", err)
+    }
+
+    // Delete team_members associations
+    _, err = tx.Exec(`
+        DELETE FROM team_members 
+        WHERE team_id IN (
+            SELECT team_id 
+            FROM group_members 
+            WHERE group_id = ?
+        )
+    `, groupID)
+    if err != nil {
+        return fmt.Errorf("failed to delete team members: %v", err)
+    }
+
+    // Delete group_vehicles
+    _, err = tx.Exec("DELETE FROM group_vehicles WHERE group_id = ?", groupID)
+    if err != nil {
+        return fmt.Errorf("failed to delete group vehicles: %v", err)
+    }
+
+    // Delete teams
+    _, err = tx.Exec(`
+        DELETE FROM teams 
+        WHERE team_id IN (
+            SELECT team_id 
+            FROM group_members 
+            WHERE group_id = ?
+        )
+    `, groupID)
+    if err != nil {
+        return fmt.Errorf("failed to delete teams: %v", err)
+    }
+
+    // Delete group_members
     _, err = tx.Exec("DELETE FROM group_members WHERE group_id = ?", groupID)
     if err != nil {
-        return err
+        return fmt.Errorf("failed to delete group members: %v", err)
     }
 
     // Finally, delete the group itself
     _, err = tx.Exec("DELETE FROM groups WHERE group_id = ?", groupID)
     if err != nil {
-        return err
+        return fmt.Errorf("failed to delete group: %v", err)
     }
 
     return tx.Commit()

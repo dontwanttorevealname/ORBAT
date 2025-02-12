@@ -950,7 +950,6 @@ func getWeapons(db *sql.DB) ([]Weapon, error) {
     }
     return weapons, nil
 }
-
 func getGroupDetails(db *sql.DB, groupID string) (map[string]interface{}, error) {
     var details = make(map[string]interface{})
     
@@ -1030,6 +1029,11 @@ func getGroupDetails(db *sql.DB, groupID string) (map[string]interface{}, error)
         directMembers = append(directMembers, currentMember)
     }
     details["direct_members"] = directMembers
+
+    // Check for errors from iterating over rows
+    if err = directRows.Err(); err != nil {
+        return nil, err
+    }
 
     // Get teams and their members
     teamRows, err := db.Query(`
@@ -1116,6 +1120,11 @@ func getGroupDetails(db *sql.DB, groupID string) (map[string]interface{}, error)
         teams = append(teams, currentTeam)
     }
     details["teams"] = teams
+
+    // Check for errors from iterating over rows
+    if err = teamRows.Err(); err != nil {
+        return nil, err
+    }
 
     // Get vehicles and their crew
     vehicleRows, err := db.Query(`
@@ -1208,8 +1217,14 @@ func getGroupDetails(db *sql.DB, groupID string) (map[string]interface{}, error)
     }
     details["vehicles"] = vehicles
 
+    // Check for errors from iterating over rows
+    if err = vehicleRows.Err(); err != nil {
+        return nil, err
+    }
+
     return details, nil
 }
+
 
 func getWeaponDetails(db *sql.DB, weaponID string) (WeaponDetails, error) {
     var details WeaponDetails

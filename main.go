@@ -1632,6 +1632,7 @@ func deleteWeapon(db *sql.DB, weaponID string) error {
     return tx.Commit()
 }
 
+
 func deleteGroup(db *sql.DB, groupID string) error {
     tx, err := db.Begin()
     if err != nil {
@@ -1646,13 +1647,38 @@ func deleteGroup(db *sql.DB, groupID string) error {
     }
     defer rows.Close()
 
-    // Delete vehicle members for each instance
+    // Delete vehicle members and their weapons for each instance
     for rows.Next() {
         var instanceID int
         if err := rows.Scan(&instanceID); err != nil {
             return err
         }
+
+        // First delete weapons for vehicle members
+        _, err = tx.Exec(`
+            DELETE FROM members_weapons 
+            WHERE member_id IN (
+                SELECT member_id 
+                FROM vehicle_members 
+                WHERE instance_id = ?
+            )`, instanceID)
+        if err != nil {
+            return err
+        }
+
+        // Delete the members themselves
+        _, err = tx.Exec(`
+            DELETE FROM members 
+            WHERE member_id IN (
+                SELECT member_id 
+                FROM vehicle_members 
+                WHERE instance_id = ?
+            )`, instanceID)
+        if err != nil {
+            return err
+        }
         
+        // Now delete vehicle members
         _, err = tx.Exec("DELETE FROM vehicle_members WHERE instance_id = ?", instanceID)
         if err != nil {
             return err
@@ -1690,6 +1716,18 @@ func deleteGroup(db *sql.DB, groupID string) error {
         // Delete weapons for team members
         _, err = tx.Exec(`
             DELETE FROM members_weapons 
+            WHERE member_id IN (
+                SELECT member_id 
+                FROM team_members 
+                WHERE team_id = ?
+            )`, teamID)
+        if err != nil {
+            return err
+        }
+
+        // Delete the members themselves
+        _, err = tx.Exec(`
+            DELETE FROM members 
             WHERE member_id IN (
                 SELECT member_id 
                 FROM team_members 
@@ -1755,7 +1793,6 @@ func deleteGroup(db *sql.DB, groupID string) error {
 
     return tx.Commit()
 }
-
 
 func getMemberWeaponsData(db *sql.DB, memberID string) (map[string]interface{}, error) {
     // Get all available weapons

@@ -899,6 +899,34 @@ func getGroups(db *sql.DB) ([]Group, error) {
     return groups, nil
 }
 
+func deleteImageFromGCS(imageURL string) error {
+    // Extract bucket name and object path from the URL
+    // URL format: https://storage.googleapis.com/BUCKET_NAME/PATH/TO/OBJECT
+    urlParts := strings.Split(imageURL, "/")
+    if len(urlParts) < 4 {
+        return fmt.Errorf("invalid GCS URL format")
+    }
+    
+    bucketName := urlParts[3]
+    objectPath := strings.Join(urlParts[4:], "/")
+
+    ctx := context.Background()
+    client, err := storage.NewClient(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to create storage client: %v", err)
+    }
+    defer client.Close()
+
+    bucket := client.Bucket(bucketName)
+    obj := bucket.Object(objectPath)
+
+    if err := obj.Delete(ctx); err != nil {
+        return fmt.Errorf("failed to delete object: %v", err)
+    }
+
+    return nil
+}
+
 func getWeapons(db *sql.DB) ([]Weapon, error) {
     rows, err := db.Query("SELECT weapon_id, weapon_name, weapon_type, weapon_caliber, image_url FROM weapons ORDER BY weapon_name")
     if err != nil {

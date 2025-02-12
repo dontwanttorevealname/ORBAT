@@ -1,7 +1,7 @@
 -- +goose Up
 CREATE TABLE vehicles (
     vehicle_id INTEGER PRIMARY KEY,
-    vehicle_name TEXT,
+    vehicle_name TEXT UNIQUE,  -- Add UNIQUE constraint
     vehicle_type TEXT,
     vehicle_armament TEXT DEFAULT 'None',
     image_url TEXT

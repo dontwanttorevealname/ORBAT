@@ -1371,6 +1371,7 @@ func deleteWeapon(db *sql.DB, weaponID string) error {
     return tx.Commit()
 }
 
+
 func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
     var group GroupDetails
     
@@ -1488,7 +1489,8 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
 
     // Get vehicles and their crew
     vehicleRows, err := db.Query(`
-        SELECT v.vehicle_id, v.vehicle_name, v.vehicle_type, v.vehicle_armament, v.image_url
+        SELECT DISTINCT v.vehicle_id, v.vehicle_name, v.vehicle_type, v.vehicle_armament, v.image_url,
+               gv.instance_id
         FROM vehicles v
         JOIN group_vehicles gv ON v.vehicle_id = gv.vehicle_id
         WHERE gv.group_id = ?`, groupID)
@@ -1499,18 +1501,18 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
 
     for vehicleRows.Next() {
         var vehicle Vehicle
-        err := vehicleRows.Scan(&vehicle.ID, &vehicle.Name, &vehicle.Type, &vehicle.Armament, &vehicle.ImageURL)
+        var instanceID string
+        err := vehicleRows.Scan(&vehicle.ID, &vehicle.Name, &vehicle.Type, &vehicle.Armament, &vehicle.ImageURL, &instanceID)
         if err != nil {
             return group, fmt.Errorf("failed to scan vehicle: %v", err)
         }
 
-        // Get vehicle crew members
+        // Get vehicle crew members for this specific vehicle instance
         crewRows, err := db.Query(`
-            SELECT m.member_id, m.member_role, m.member_rank
+            SELECT DISTINCT m.member_id, m.member_role, m.member_rank
             FROM members m
             JOIN vehicle_members vm ON m.member_id = vm.member_id
-            JOIN group_vehicles gv ON vm.instance_id = gv.instance_id
-            WHERE gv.group_id = ? AND gv.vehicle_id = ?`, groupID, vehicle.ID)
+            WHERE vm.instance_id = ?`, instanceID)
         if err != nil {
             return group, fmt.Errorf("failed to get vehicle crew: %v", err)
         }
@@ -1521,6 +1523,26 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
             err := crewRows.Scan(&m.ID, &m.Role, &m.Rank)
             if err != nil {
                 return group, fmt.Errorf("failed to scan crew member: %v", err)
+            }
+
+            // Get crew member's weapons
+            weaponRows, err := db.Query(`
+                SELECT w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
+                FROM weapons w
+                JOIN members_weapons mw ON w.weapon_id = mw.weapon_id
+                WHERE mw.member_id = ?`, m.ID)
+            if err != nil {
+                return group, fmt.Errorf("failed to get crew weapons: %v", err)
+            }
+            defer weaponRows.Close()
+
+            for weaponRows.Next() {
+                var w Weapon
+                err := weaponRows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber)
+                if err != nil {
+                    return group, fmt.Errorf("failed to scan weapon: %v", err)
+                }
+                m.Weapons = append(m.Weapons, w)
             }
 
             vehicle.Crew = append(vehicle.Crew, m)

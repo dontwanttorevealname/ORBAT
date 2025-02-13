@@ -1383,12 +1383,12 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
         return group, fmt.Errorf("failed to get group details: %v", err)
     }
 
-    // Get direct members
+    // Get direct members (excluding team members and vehicle crew)
     memberRows, err := db.Query(`
         SELECT DISTINCT m.member_id, m.member_role, m.member_rank
         FROM members m
         JOIN group_members gm ON m.member_id = gm.member_id
-        WHERE gm.group_id = ? AND gm.team_id IS NULL AND gm.vehicle_id IS NULL`, groupID)
+        WHERE gm.group_id = ? AND gm.team_id IS NULL`, groupID)
     if err != nil {
         return group, fmt.Errorf("failed to get direct members: %v", err)
     }
@@ -1486,12 +1486,12 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
         group.Teams = append(group.Teams, team)
     }
 
-    // Get vehicles and their crew members
+    // Get vehicles and their crew
     vehicleRows, err := db.Query(`
-        SELECT DISTINCT v.vehicle_id, v.vehicle_name, v.vehicle_type, v.vehicle_armament
+        SELECT v.vehicle_id, v.vehicle_name, v.vehicle_type, v.vehicle_armament, v.image_url
         FROM vehicles v
-        JOIN group_members gm ON v.vehicle_id = gm.vehicle_id
-        WHERE gm.group_id = ?`, groupID)
+        JOIN group_vehicles gv ON v.vehicle_id = gv.vehicle_id
+        WHERE gv.group_id = ?`, groupID)
     if err != nil {
         return group, fmt.Errorf("failed to get vehicles: %v", err)
     }
@@ -1499,7 +1499,7 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
 
     for vehicleRows.Next() {
         var vehicle Vehicle
-        err := vehicleRows.Scan(&vehicle.ID, &vehicle.Name, &vehicle.Type, &vehicle.Armament)
+        err := vehicleRows.Scan(&vehicle.ID, &vehicle.Name, &vehicle.Type, &vehicle.Armament, &vehicle.ImageURL)
         if err != nil {
             return group, fmt.Errorf("failed to scan vehicle: %v", err)
         }
@@ -1508,10 +1508,11 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
         crewRows, err := db.Query(`
             SELECT m.member_id, m.member_role, m.member_rank
             FROM members m
-            JOIN group_members gm ON m.member_id = gm.member_id
-            WHERE gm.vehicle_id = ? AND gm.group_id = ?`, vehicle.ID, groupID)
+            JOIN vehicle_members vm ON m.member_id = vm.member_id
+            JOIN group_vehicles gv ON vm.instance_id = gv.instance_id
+            WHERE gv.group_id = ? AND gv.vehicle_id = ?`, groupID, vehicle.ID)
         if err != nil {
-            return group, fmt.Errorf("failed to get crew members: %v", err)
+            return group, fmt.Errorf("failed to get vehicle crew: %v", err)
         }
         defer crewRows.Close()
 
@@ -1520,26 +1521,6 @@ func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
             err := crewRows.Scan(&m.ID, &m.Role, &m.Rank)
             if err != nil {
                 return group, fmt.Errorf("failed to scan crew member: %v", err)
-            }
-
-            // Get crew member's weapons
-            weaponRows, err := db.Query(`
-                SELECT w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
-                FROM weapons w
-                JOIN members_weapons mw ON w.weapon_id = mw.weapon_id
-                WHERE mw.member_id = ?`, m.ID)
-            if err != nil {
-                return group, fmt.Errorf("failed to get crew member weapons: %v", err)
-            }
-            defer weaponRows.Close()
-
-            for weaponRows.Next() {
-                var w Weapon
-                err := weaponRows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber)
-                if err != nil {
-                    return group, fmt.Errorf("failed to scan weapon: %v", err)
-                }
-                m.Weapons = append(m.Weapons, w)
             }
 
             vehicle.Crew = append(vehicle.Crew, m)
@@ -1561,11 +1542,11 @@ func deleteGroup(db *sql.DB, groupID string) error {
     // 1. Get all member IDs (direct, team, and vehicle members)
     memberIDs := make(map[string]bool)
 
-    // Get all member IDs from group_members
+    // Get direct member IDs
     rows, err := tx.Query(`
         SELECT member_id 
         FROM group_members 
-        WHERE group_id = ?`, groupID)
+        WHERE group_id = ? AND member_id IS NOT NULL`, groupID)
     if err != nil {
         return fmt.Errorf("failed to get member IDs: %v", err)
     }
@@ -1598,6 +1579,25 @@ func deleteGroup(db *sql.DB, groupID string) error {
         memberIDs[memberID] = true
     }
 
+    // Get vehicle member IDs
+    vehicleRows, err := tx.Query(`
+        SELECT vm.member_id
+        FROM vehicle_members vm
+        JOIN group_vehicles gv ON vm.instance_id = gv.instance_id
+        WHERE gv.group_id = ?`, groupID)
+    if err != nil {
+        return fmt.Errorf("failed to get vehicle member IDs: %v", err)
+    }
+    defer vehicleRows.Close()
+
+    for vehicleRows.Next() {
+        var memberID string
+        if err := vehicleRows.Scan(&memberID); err != nil {
+            return fmt.Errorf("failed to scan vehicle member ID: %v", err)
+        }
+        memberIDs[memberID] = true
+    }
+
     // 2. Delete weapon associations
     for memberID := range memberIDs {
         _, err = tx.Exec("DELETE FROM members_weapons WHERE member_id = ?", memberID)
@@ -1606,7 +1606,25 @@ func deleteGroup(db *sql.DB, groupID string) error {
         }
     }
 
-    // 3. Delete team_members associations
+    // 3. Delete vehicle member associations
+    _, err = tx.Exec(`
+        DELETE FROM vehicle_members 
+        WHERE instance_id IN (
+            SELECT instance_id 
+            FROM group_vehicles 
+            WHERE group_id = ?
+        )`, groupID)
+    if err != nil {
+        return fmt.Errorf("failed to delete vehicle members: %v", err)
+    }
+
+    // 4. Delete group vehicle associations
+    _, err = tx.Exec("DELETE FROM group_vehicles WHERE group_id = ?", groupID)
+    if err != nil {
+        return fmt.Errorf("failed to delete group vehicles: %v", err)
+    }
+
+    // 5. Delete team member associations
     _, err = tx.Exec(`
         DELETE FROM team_members 
         WHERE team_id IN (
@@ -1618,13 +1636,13 @@ func deleteGroup(db *sql.DB, groupID string) error {
         return fmt.Errorf("failed to delete team members: %v", err)
     }
 
-    // 4. Delete group_members associations
+    // 6. Delete group member associations
     _, err = tx.Exec("DELETE FROM group_members WHERE group_id = ?", groupID)
     if err != nil {
         return fmt.Errorf("failed to delete group members: %v", err)
     }
 
-    // 5. Delete members
+    // 7. Delete members
     for memberID := range memberIDs {
         _, err = tx.Exec("DELETE FROM members WHERE member_id = ?", memberID)
         if err != nil {
@@ -1632,7 +1650,7 @@ func deleteGroup(db *sql.DB, groupID string) error {
         }
     }
 
-    // 6. Delete teams
+    // 8. Delete teams
     _, err = tx.Exec(`
         DELETE FROM teams 
         WHERE team_id IN (
@@ -1644,7 +1662,7 @@ func deleteGroup(db *sql.DB, groupID string) error {
         return fmt.Errorf("failed to delete teams: %v", err)
     }
 
-    // 7. Finally delete the group
+    // 9. Finally delete the group
     _, err = tx.Exec("DELETE FROM groups WHERE group_id = ?", groupID)
     if err != nil {
         return fmt.Errorf("failed to delete group: %v", err)

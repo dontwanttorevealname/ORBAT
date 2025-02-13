@@ -36,6 +36,13 @@
         .weapons div {
             margin: 5px 0;
         }
+        .weapon-link {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .weapon-link:hover {
+            text-decoration: underline;
+        }
         .weapons-form {
             margin-top: 10px;
         }
@@ -119,7 +126,7 @@
 </head>
 <body>
     <div class="nav">
-        <a href="/groups">Back to Groups</a>
+        <a href="/">Back to Groups</a>
     </div>
 
     <h1>{{.Name}} ({{.Nationality}})</h1>
@@ -135,7 +142,7 @@
             <div class="weapons">
                 <strong>Weapons:</strong>
                 {{range .Weapons}}
-                <div>{{.Name}} ({{.Type}}, {{.Caliber}})</div>
+                <div><a href="/weapon/{{.ID}}" class="weapon-link">{{.Name}}</a> ({{.Type}}, {{.Caliber}})</div>
                 {{end}}
             </div>
             {{end}}
@@ -158,7 +165,7 @@
                 <div class="weapons">
                     <strong>Weapons:</strong>
                     {{range .Weapons}}
-                    <div>{{.Name}} ({{.Type}}, {{.Caliber}})</div>
+                    <div><a href="/weapon/{{.ID}}" class="weapon-link">{{.Name}}</a> ({{.Type}}, {{.Caliber}})</div>
                     {{end}}
                 </div>
                 {{end}}
@@ -187,7 +194,7 @@
                     <div class="weapons">
                         <strong>Weapons:</strong>
                         {{range .Weapons}}
-                        <div>{{.Name}} ({{.Type}}, {{.Caliber}})</div>
+                        <div><a href="/weapon/{{.ID}}" class="weapon-link">{{.Name}}</a> ({{.Type}}, {{.Caliber}})</div>
                         {{end}}
                     </div>
                     {{end}}

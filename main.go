@@ -886,18 +886,14 @@ func weaponExists(db *sql.DB, name string) (bool, int, error) {
     return true, id, nil
 }
 
-
 func getGroups(db *sql.DB) ([]Group, error) {
     rows, err := db.Query(`
         SELECT 
             g.group_id,
             g.group_name,
             g.group_nationality,
-            g.group_size,
-            COUNT(DISTINCT gm.member_id) as actual_size
+            g.group_size
         FROM groups g
-        LEFT JOIN group_members gm ON g.group_id = gm.group_id
-        GROUP BY g.group_id, g.group_name, g.group_nationality, g.group_size
         ORDER BY g.group_name`)
     if err != nil {
         return nil, err
@@ -907,7 +903,7 @@ func getGroups(db *sql.DB) ([]Group, error) {
     var groups []Group
     for rows.Next() {
         var g Group
-        if err := rows.Scan(&g.ID, &g.Name, &g.Nationality, &g.Size, &g.ActualSize); err != nil {
+        if err := rows.Scan(&g.ID, &g.Name, &g.Nationality, &g.Size); err != nil {
             return nil, err
         }
         groups = append(groups, g)

@@ -47,16 +47,52 @@
             border-radius: 4px;
             cursor: pointer;
         }
+        button:hover {
+            background: #0052a3;
+        }
         .delete-btn {
             background: #cc0000;
         }
+        .delete-btn:hover {
+            background: #aa0000;
+        }
         .nav {
             margin-bottom: 20px;
+        }
+        .nav a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            text-decoration: underline;
         }
         .image-indicator {
             font-size: 0.8em;
             color: #666;
             margin-left: 10px;
+        }
+        .vehicle-info {
+            flex-grow: 1;
+        }
+        .help-text {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+        }
+        input[type="file"] {
+            padding: 8px 0;
+        }
+        .error-message {
+            color: #cc0000;
+            margin-top: 5px;
+            display: none;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -73,6 +109,7 @@
             <div class="form-group">
                 <label for="name">Vehicle Name:</label>
                 <input type="text" id="name" name="name" required>
+                <div id="nameError" class="error-message"></div>
             </div>
             <div class="form-group">
                 <label for="type">Vehicle Type:</label>
@@ -111,6 +148,9 @@
         document.getElementById('vehicleForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            // Reset error message
+            document.getElementById('nameError').style.display = 'none';
+            
             const formData = new FormData(this);
             
             try {
@@ -120,7 +160,7 @@
                 });
                 
                 if (response.status === 409) {
-                    const replace = confirm('A vehicle with this name already exists. Would you like to replace it with this new version?');
+                    const replace = confirm('A vehicle with this name already exists. Would you like to replace it with this new version?\n\nNOTE: Replacing will update the vehicle for all groups currently using it.');
                     
                     if (replace) {
                         formData.append('replace', 'true');
@@ -135,13 +175,20 @@
                         } else {
                             throw new Error('Failed to replace vehicle');
                         }
+                    } else {
+                        // Show error message and let user modify the name
+                        const nameError = document.getElementById('nameError');
+                        nameError.textContent = 'Please choose a different name for the vehicle.';
+                        nameError.style.display = 'block';
+                        document.getElementById('name').focus();
+                        return;
                     }
-                    return;
                 } else if (response.ok) {
                     window.location.href = '/vehicles';
                     return;
                 } else {
-                    throw new Error('Failed to add vehicle');
+                    const errorText = await response.text();
+                    throw new Error(errorText || 'Failed to add vehicle');
                 }
             } catch (error) {
                 console.error('Error:', error);

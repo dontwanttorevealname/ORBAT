@@ -961,280 +961,6 @@ func getWeapons(db *sql.DB) ([]Weapon, error) {
     }
     return weapons, nil
 }
-func getGroupDetails(db *sql.DB, groupID string) (map[string]interface{}, error) {
-    var details = make(map[string]interface{})
-    
-    // Get group info
-    var name, nationality string
-    var size int
-    err := db.QueryRow(`
-        SELECT group_name, group_nationality, group_size 
-        FROM groups 
-        WHERE group_id = ?`, groupID).Scan(&name, &nationality, &size)
-    if err != nil {
-        return nil, err
-    }
-    
-    details["name"] = name
-    details["nationality"] = nationality
-    details["size"] = size
-
-    // Get direct members
-    directRows, err := db.Query(`
-        SELECT 
-            m.member_id,
-            m.member_role,
-            m.member_rank,
-            w.weapon_id,
-            w.weapon_name,
-            w.weapon_type,
-            w.weapon_caliber
-        FROM members m
-        JOIN group_members gm ON m.member_id = gm.member_id
-        LEFT JOIN members_weapons mw ON m.member_id = mw.member_id
-        LEFT JOIN weapons w ON mw.weapon_id = w.weapon_id
-        WHERE gm.group_id = ? AND gm.team_id IS NULL
-        ORDER BY m.member_role`, groupID)
-    if err != nil {
-        return nil, err
-    }
-    defer directRows.Close()
-
-    var directMembers []map[string]interface{}
-    currentMember := make(map[string]interface{})
-    var currentMemberID int
-    
-    for directRows.Next() {
-        var memberID int
-        var role, rank string
-        var weaponID sql.NullInt64
-        var weaponName, weaponType, weaponCaliber sql.NullString
-        
-        if err := directRows.Scan(&memberID, &role, &rank, &weaponID, &weaponName, &weaponType, &weaponCaliber); err != nil {
-            return nil, err
-        }
-        
-        if currentMemberID != memberID {
-            if currentMemberID != 0 {
-                directMembers = append(directMembers, currentMember)
-            }
-            currentMember = map[string]interface{}{
-                "id":      memberID,
-                "role":    role,
-                "rank":    rank,
-                "weapons": make([]map[string]interface{}, 0),
-            }
-            currentMemberID = memberID
-        }
-        
-        if weaponID.Valid {
-            currentMember["weapons"] = append(currentMember["weapons"].([]map[string]interface{}), map[string]interface{}{
-                "id":      weaponID.Int64,
-                "name":    weaponName.String,
-                "type":    weaponType.String,
-                "caliber": weaponCaliber.String,
-            })
-        }
-    }
-    if currentMemberID != 0 {
-        directMembers = append(directMembers, currentMember)
-    }
-    details["direct_members"] = directMembers
-
-    // Check for errors from iterating over rows
-    if err = directRows.Err(); err != nil {
-        return nil, err
-    }
-
-    // Get teams and their members
-    teamRows, err := db.Query(`
-        SELECT 
-            t.team_id,
-            t.team_name,
-            t.team_size,
-            m.member_id,
-            m.member_role,
-            m.member_rank,
-            w.weapon_id,
-            w.weapon_name,
-            w.weapon_type,
-            w.weapon_caliber
-        FROM teams t
-        JOIN group_members gm ON t.team_id = gm.team_id
-        LEFT JOIN team_members tm ON t.team_id = tm.team_id
-        LEFT JOIN members m ON tm.member_id = m.member_id
-        LEFT JOIN members_weapons mw ON m.member_id = mw.member_id
-        LEFT JOIN weapons w ON mw.weapon_id = w.weapon_id
-        WHERE gm.group_id = ?
-        ORDER BY t.team_id, m.member_role`, groupID)
-    if err != nil {
-        return nil, err
-    }
-    defer teamRows.Close()
-
-    var teams []map[string]interface{}
-    currentTeam := make(map[string]interface{})
-    var currentTeamID int
-    currentMemberID = 0
-    
-    for teamRows.Next() {
-        var teamID int
-        var teamName string
-        var teamSize int
-        var memberID sql.NullInt64
-        var role, rank sql.NullString
-        var weaponID sql.NullInt64
-        var weaponName, weaponType, weaponCaliber sql.NullString
-        
-        if err := teamRows.Scan(&teamID, &teamName, &teamSize, &memberID, &role, &rank, 
-            &weaponID, &weaponName, &weaponType, &weaponCaliber); err != nil {
-            return nil, err
-        }
-        
-        if currentTeamID != teamID {
-            if currentTeamID != 0 {
-                teams = append(teams, currentTeam)
-            }
-            currentTeam = map[string]interface{}{
-                "id":      teamID,
-                "name":    teamName,
-                "size":    teamSize,
-                "members": make([]map[string]interface{}, 0),
-            }
-            currentTeamID = teamID
-            currentMemberID = 0
-        }
-        
-        if memberID.Valid && (currentMemberID != int(memberID.Int64)) {
-            currentMember = map[string]interface{}{
-                "id":      memberID.Int64,
-                "role":    role.String,
-                "rank":    rank.String,
-                "weapons": make([]map[string]interface{}, 0),
-            }
-            currentTeam["members"] = append(currentTeam["members"].([]map[string]interface{}), currentMember)
-            currentMemberID = int(memberID.Int64)
-        }
-        
-        if weaponID.Valid {
-            members := currentTeam["members"].([]map[string]interface{})
-            lastMember := members[len(members)-1]
-            lastMember["weapons"] = append(lastMember["weapons"].([]map[string]interface{}), map[string]interface{}{
-                "id":      weaponID.Int64,
-                "name":    weaponName.String,
-                "type":    weaponType.String,
-                "caliber": weaponCaliber.String,
-            })
-        }
-    }
-    if currentTeamID != 0 {
-        teams = append(teams, currentTeam)
-    }
-    details["teams"] = teams
-
-    // Check for errors from iterating over rows
-    if err = teamRows.Err(); err != nil {
-        return nil, err
-    }
-
-    // Get vehicles and their crew
-    vehicleRows, err := db.Query(`
-        SELECT 
-            v.vehicle_id,
-            v.vehicle_name,
-            v.vehicle_type,
-            v.vehicle_armament,
-            gv.instance_id,
-            m.member_id,
-            m.member_role,
-            m.member_rank,
-            w.weapon_id,
-            w.weapon_name,
-            w.weapon_type,
-            w.weapon_caliber
-        FROM group_vehicles gv
-        JOIN vehicles v ON v.vehicle_id = gv.vehicle_id
-        LEFT JOIN vehicle_members vm ON vm.instance_id = gv.instance_id
-        LEFT JOIN members m ON m.member_id = vm.member_id
-        LEFT JOIN members_weapons mw ON m.member_id = mw.member_id
-        LEFT JOIN weapons w ON mw.weapon_id = w.weapon_id
-        WHERE gv.group_id = ?
-        ORDER BY gv.instance_id, m.member_role`, groupID)
-    if err != nil {
-        return nil, err
-    }
-    defer vehicleRows.Close()
-
-    var vehicles []map[string]interface{}
-    currentVehicle := make(map[string]interface{})
-    var currentInstanceID int
-    currentMemberID = 0
-
-    for vehicleRows.Next() {
-        var vehicleID int
-        var vehicleName, vehicleType, vehicleArmament string
-        var instanceID int
-        var memberID sql.NullInt64
-        var role, rank sql.NullString
-        var weaponID sql.NullInt64
-        var weaponName, weaponType, weaponCaliber sql.NullString
-
-        if err := vehicleRows.Scan(&vehicleID, &vehicleName, &vehicleType, &vehicleArmament,
-            &instanceID, &memberID, &role, &rank,
-            &weaponID, &weaponName, &weaponType, &weaponCaliber); err != nil {
-            return nil, err
-        }
-
-        if currentInstanceID != instanceID {
-            if currentInstanceID != 0 {
-                vehicles = append(vehicles, currentVehicle)
-            }
-            currentVehicle = map[string]interface{}{
-                "id":        vehicleID,
-                "name":      vehicleName,
-                "type":      vehicleType,
-                "armament":  vehicleArmament,
-                "instance":  instanceID,
-                "crew":      make([]map[string]interface{}, 0),
-            }
-            currentInstanceID = instanceID
-            currentMemberID = 0
-        }
-
-        if memberID.Valid && (currentMemberID != int(memberID.Int64)) {
-            currentMember = map[string]interface{}{
-                "id":      memberID.Int64,
-                "role":    role.String,
-                "rank":    rank.String,
-                "weapons": make([]map[string]interface{}, 0),
-            }
-            currentVehicle["crew"] = append(currentVehicle["crew"].([]map[string]interface{}), currentMember)
-            currentMemberID = int(memberID.Int64)
-        }
-
-        if weaponID.Valid && currentMemberID != 0 {
-            crew := currentVehicle["crew"].([]map[string]interface{})
-            lastMember := crew[len(crew)-1]
-            lastMember["weapons"] = append(lastMember["weapons"].([]map[string]interface{}), map[string]interface{}{
-                "id":      weaponID.Int64,
-                "name":    weaponName.String,
-                "type":    weaponType.String,
-                "caliber": weaponCaliber.String,
-            })
-        }
-    }
-    if currentInstanceID != 0 {
-        vehicles = append(vehicles, currentVehicle)
-    }
-    details["vehicles"] = vehicles
-
-    // Check for errors from iterating over rows
-    if err = vehicleRows.Err(); err != nil {
-        return nil, err
-    }
-
-    return details, nil
-}
 
 
 func getWeaponDetails(db *sql.DB, weaponID string) (WeaponDetails, error) {
@@ -1643,6 +1369,186 @@ func deleteWeapon(db *sql.DB, weaponID string) error {
     return tx.Commit()
 }
 
+func getGroupDetails(db *sql.DB, groupID string) (GroupDetails, error) {
+    var group GroupDetails
+    
+    // Get basic group info
+    err := db.QueryRow(`
+        SELECT g.group_id, g.group_name, g.group_size, g.group_nationality 
+        FROM groups g 
+        WHERE g.group_id = ?`, groupID).Scan(&group.ID, &group.Name, &group.Size, &group.Nationality)
+    if err != nil {
+        return group, fmt.Errorf("failed to get group details: %v", err)
+    }
+
+    // Get direct members
+    memberRows, err := db.Query(`
+        SELECT DISTINCT m.member_id, m.member_role, m.member_rank
+        FROM members m
+        JOIN group_members gm ON m.member_id = gm.member_id
+        WHERE gm.group_id = ? AND gm.team_id IS NULL AND gm.vehicle_id IS NULL`, groupID)
+    if err != nil {
+        return group, fmt.Errorf("failed to get direct members: %v", err)
+    }
+    defer memberRows.Close()
+
+    for memberRows.Next() {
+        var m Member
+        err := memberRows.Scan(&m.ID, &m.Role, &m.Rank)
+        if err != nil {
+            return group, fmt.Errorf("failed to scan member: %v", err)
+        }
+
+        // Get member's weapons
+        weaponRows, err := db.Query(`
+            SELECT w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
+            FROM weapons w
+            JOIN members_weapons mw ON w.weapon_id = mw.weapon_id
+            WHERE mw.member_id = ?`, m.ID)
+        if err != nil {
+            return group, fmt.Errorf("failed to get member weapons: %v", err)
+        }
+        defer weaponRows.Close()
+
+        for weaponRows.Next() {
+            var w Weapon
+            err := weaponRows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber)
+            if err != nil {
+                return group, fmt.Errorf("failed to scan weapon: %v", err)
+            }
+            m.Weapons = append(m.Weapons, w)
+        }
+
+        group.DirectMembers = append(group.DirectMembers, m)
+    }
+
+    // Get teams and their members
+    teamRows, err := db.Query(`
+        SELECT DISTINCT t.team_id, t.team_name, t.team_size
+        FROM teams t
+        JOIN group_members gm ON t.team_id = gm.team_id
+        WHERE gm.group_id = ?`, groupID)
+    if err != nil {
+        return group, fmt.Errorf("failed to get teams: %v", err)
+    }
+    defer teamRows.Close()
+
+    for teamRows.Next() {
+        var team Team
+        err := teamRows.Scan(&team.ID, &team.Name, &team.Size)
+        if err != nil {
+            return group, fmt.Errorf("failed to scan team: %v", err)
+        }
+
+        // Get team members
+        teamMemberRows, err := db.Query(`
+            SELECT m.member_id, m.member_role, m.member_rank
+            FROM members m
+            JOIN team_members tm ON m.member_id = tm.member_id
+            WHERE tm.team_id = ?`, team.ID)
+        if err != nil {
+            return group, fmt.Errorf("failed to get team members: %v", err)
+        }
+        defer teamMemberRows.Close()
+
+        for teamMemberRows.Next() {
+            var m Member
+            err := teamMemberRows.Scan(&m.ID, &m.Role, &m.Rank)
+            if err != nil {
+                return group, fmt.Errorf("failed to scan team member: %v", err)
+            }
+
+            // Get member's weapons
+            weaponRows, err := db.Query(`
+                SELECT w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
+                FROM weapons w
+                JOIN members_weapons mw ON w.weapon_id = mw.weapon_id
+                WHERE mw.member_id = ?`, m.ID)
+            if err != nil {
+                return group, fmt.Errorf("failed to get team member weapons: %v", err)
+            }
+            defer weaponRows.Close()
+
+            for weaponRows.Next() {
+                var w Weapon
+                err := weaponRows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber)
+                if err != nil {
+                    return group, fmt.Errorf("failed to scan weapon: %v", err)
+                }
+                m.Weapons = append(m.Weapons, w)
+            }
+
+            team.Members = append(team.Members, m)
+        }
+
+        group.Teams = append(group.Teams, team)
+    }
+
+    // Get vehicles and their crew members
+    vehicleRows, err := db.Query(`
+        SELECT DISTINCT v.vehicle_id, v.vehicle_name, v.vehicle_type, v.vehicle_armament
+        FROM vehicles v
+        JOIN group_members gm ON v.vehicle_id = gm.vehicle_id
+        WHERE gm.group_id = ?`, groupID)
+    if err != nil {
+        return group, fmt.Errorf("failed to get vehicles: %v", err)
+    }
+    defer vehicleRows.Close()
+
+    for vehicleRows.Next() {
+        var vehicle Vehicle
+        err := vehicleRows.Scan(&vehicle.ID, &vehicle.Name, &vehicle.Type, &vehicle.Armament)
+        if err != nil {
+            return group, fmt.Errorf("failed to scan vehicle: %v", err)
+        }
+
+        // Get vehicle crew members
+        crewRows, err := db.Query(`
+            SELECT m.member_id, m.member_role, m.member_rank
+            FROM members m
+            JOIN group_members gm ON m.member_id = gm.member_id
+            WHERE gm.vehicle_id = ? AND gm.group_id = ?`, vehicle.ID, groupID)
+        if err != nil {
+            return group, fmt.Errorf("failed to get crew members: %v", err)
+        }
+        defer crewRows.Close()
+
+        for crewRows.Next() {
+            var m Member
+            err := crewRows.Scan(&m.ID, &m.Role, &m.Rank)
+            if err != nil {
+                return group, fmt.Errorf("failed to scan crew member: %v", err)
+            }
+
+            // Get crew member's weapons
+            weaponRows, err := db.Query(`
+                SELECT w.weapon_id, w.weapon_name, w.weapon_type, w.weapon_caliber
+                FROM weapons w
+                JOIN members_weapons mw ON w.weapon_id = mw.weapon_id
+                WHERE mw.member_id = ?`, m.ID)
+            if err != nil {
+                return group, fmt.Errorf("failed to get crew member weapons: %v", err)
+            }
+            defer weaponRows.Close()
+
+            for weaponRows.Next() {
+                var w Weapon
+                err := weaponRows.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber)
+                if err != nil {
+                    return group, fmt.Errorf("failed to scan weapon: %v", err)
+                }
+                m.Weapons = append(m.Weapons, w)
+            }
+
+            vehicle.Crew = append(vehicle.Crew, m)
+        }
+
+        group.Vehicles = append(group.Vehicles, vehicle)
+    }
+
+    return group, nil
+}
+
 func deleteGroup(db *sql.DB, groupID string) error {
     tx, err := db.Begin()
     if err != nil {
@@ -1650,118 +1556,93 @@ func deleteGroup(db *sql.DB, groupID string) error {
     }
     defer tx.Rollback()
 
-    // First delete all weapons for any member in the group (direct members, team members, and vehicle members)
-    _, err = tx.Exec(`
-        DELETE FROM members_weapons 
-        WHERE member_id IN (
-            -- Direct members
-            SELECT m.member_id 
-            FROM members m
-            JOIN group_members gm ON m.member_id = gm.member_id
-            WHERE gm.group_id = ?
-            UNION
-            -- Team members
-            SELECT m.member_id
-            FROM members m
-            JOIN team_members tm ON m.member_id = tm.member_id
-            JOIN teams t ON tm.team_id = t.team_id
-            JOIN group_members gm ON t.team_id = gm.team_id
-            WHERE gm.group_id = ?
-            UNION
-            -- Vehicle members
-            SELECT m.member_id
-            FROM members m
-            JOIN vehicle_members vm ON m.member_id = vm.member_id
-            JOIN group_vehicles gv ON vm.instance_id = gv.instance_id
-            WHERE gv.group_id = ?
-        )
-    `, groupID, groupID, groupID)
+    // 1. Get all member IDs (direct, team, and vehicle members)
+    memberIDs := make(map[string]bool)
+
+    // Get all member IDs from group_members
+    rows, err := tx.Query(`
+        SELECT member_id 
+        FROM group_members 
+        WHERE group_id = ?`, groupID)
     if err != nil {
-        return fmt.Errorf("failed to delete member weapons: %v", err)
+        return fmt.Errorf("failed to get member IDs: %v", err)
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var memberID string
+        if err := rows.Scan(&memberID); err != nil {
+            return fmt.Errorf("failed to scan member ID: %v", err)
+        }
+        memberIDs[memberID] = true
     }
 
-    // Delete all members in the group
-    _, err = tx.Exec(`
-        DELETE FROM members 
-        WHERE member_id IN (
-            -- Direct members
-            SELECT m.member_id 
-            FROM members m
-            JOIN group_members gm ON m.member_id = gm.member_id
-            WHERE gm.group_id = ?
-            UNION
-            -- Team members
-            SELECT m.member_id
-            FROM members m
-            JOIN team_members tm ON m.member_id = tm.member_id
-            JOIN teams t ON tm.team_id = t.team_id
-            JOIN group_members gm ON t.team_id = gm.team_id
-            WHERE gm.group_id = ?
-            UNION
-            -- Vehicle members
-            SELECT m.member_id
-            FROM members m
-            JOIN vehicle_members vm ON m.member_id = vm.member_id
-            JOIN group_vehicles gv ON vm.instance_id = gv.instance_id
-            WHERE gv.group_id = ?
-        )
-    `, groupID, groupID, groupID)
+    // Get team member IDs
+    teamRows, err := tx.Query(`
+        SELECT tm.member_id
+        FROM team_members tm
+        JOIN group_members gm ON tm.team_id = gm.team_id
+        WHERE gm.group_id = ?`, groupID)
     if err != nil {
-        return fmt.Errorf("failed to delete members: %v", err)
+        return fmt.Errorf("failed to get team member IDs: %v", err)
+    }
+    defer teamRows.Close()
+
+    for teamRows.Next() {
+        var memberID string
+        if err := teamRows.Scan(&memberID); err != nil {
+            return fmt.Errorf("failed to scan team member ID: %v", err)
+        }
+        memberIDs[memberID] = true
     }
 
-    // Delete vehicle_members associations
-    _, err = tx.Exec(`
-        DELETE FROM vehicle_members 
-        WHERE instance_id IN (
-            SELECT instance_id 
-            FROM group_vehicles 
-            WHERE group_id = ?
-        )
-    `, groupID)
-    if err != nil {
-        return fmt.Errorf("failed to delete vehicle members: %v", err)
+    // 2. Delete weapon associations
+    for memberID := range memberIDs {
+        _, err = tx.Exec("DELETE FROM members_weapons WHERE member_id = ?", memberID)
+        if err != nil {
+            return fmt.Errorf("failed to delete weapon associations: %v", err)
+        }
     }
 
-    // Delete team_members associations
+    // 3. Delete team_members associations
     _, err = tx.Exec(`
         DELETE FROM team_members 
         WHERE team_id IN (
             SELECT team_id 
             FROM group_members 
-            WHERE group_id = ?
-        )
-    `, groupID)
+            WHERE group_id = ? AND team_id IS NOT NULL
+        )`, groupID)
     if err != nil {
         return fmt.Errorf("failed to delete team members: %v", err)
     }
 
-    // Delete group_vehicles
-    _, err = tx.Exec("DELETE FROM group_vehicles WHERE group_id = ?", groupID)
-    if err != nil {
-        return fmt.Errorf("failed to delete group vehicles: %v", err)
-    }
-
-    // Delete teams
-    _, err = tx.Exec(`
-        DELETE FROM teams 
-        WHERE team_id IN (
-            SELECT team_id 
-            FROM group_members 
-            WHERE group_id = ?
-        )
-    `, groupID)
-    if err != nil {
-        return fmt.Errorf("failed to delete teams: %v", err)
-    }
-
-    // Delete group_members
+    // 4. Delete group_members associations
     _, err = tx.Exec("DELETE FROM group_members WHERE group_id = ?", groupID)
     if err != nil {
         return fmt.Errorf("failed to delete group members: %v", err)
     }
 
-    // Finally, delete the group itself
+    // 5. Delete members
+    for memberID := range memberIDs {
+        _, err = tx.Exec("DELETE FROM members WHERE member_id = ?", memberID)
+        if err != nil {
+            return fmt.Errorf("failed to delete members: %v", err)
+        }
+    }
+
+    // 6. Delete teams
+    _, err = tx.Exec(`
+        DELETE FROM teams 
+        WHERE team_id IN (
+            SELECT DISTINCT team_id 
+            FROM group_members 
+            WHERE group_id = ? AND team_id IS NOT NULL
+        )`, groupID)
+    if err != nil {
+        return fmt.Errorf("failed to delete teams: %v", err)
+    }
+
+    // 7. Finally delete the group
     _, err = tx.Exec("DELETE FROM groups WHERE group_id = ?", groupID)
     if err != nil {
         return fmt.Errorf("failed to delete group: %v", err)

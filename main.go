@@ -46,15 +46,6 @@ type Team struct {
     Members []Member
 }
 
-type GroupDetails struct {
-    ID            int
-    Name          string
-    Size          int
-    Nationality   string
-    DirectMembers []Member
-    Teams         []Team
-}
-
 type WeaponUser struct {
     Role     string
     Rank     string
@@ -77,11 +68,22 @@ type WeaponDetails struct {
 }
 
 type Vehicle struct {
-    ID        int
+    ID        string
     Name      string
     Type      string
     Armament  string
     ImageURL  sql.NullString
+    Crew      []Member  // Add this field
+}
+
+type GroupDetails struct {
+    ID            string
+    Name          string
+    Size          int
+    Nationality   string
+    DirectMembers []Member
+    Teams         []Team
+    Vehicles      []Vehicle  // Add this field
 }
 
 type VehicleDetails struct {

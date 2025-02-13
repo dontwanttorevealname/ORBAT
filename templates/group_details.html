@@ -182,7 +182,7 @@
         <h2>Vehicles</h2>
         {{range .Vehicles}}
         <div class="vehicle">
-            <h3>{{.Name}} ({{.Type}})</h3>
+            <h3><a href="/vehicle/{{.ID}}" class="vehicle-link">{{.Name}}</a> ({{.Type}})</h3>
             <p>Armament: {{.Armament}}</p>
             {{if .Crew}}
             <div class="crew">

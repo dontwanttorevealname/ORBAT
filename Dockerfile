@@ -1,3 +1,4 @@
+
 # Build stage
 FROM golang:1.22-alpine AS builder
 
@@ -32,8 +33,9 @@ RUN adduser -D appuser
 WORKDIR /app
 
 # Copy binary and templates from builder
-COPY --from=builder /app/main .
-COPY --from=builder /app/templates ./templates/
+#COPY --from=builder /app/main .
+#COPY --from=builder /app/templates ./templates/
+COPY --from=builder /app .
 
 # Verify templates directory exists and has content
 RUN ls -la /app/templates/

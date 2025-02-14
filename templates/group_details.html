@@ -137,7 +137,7 @@
         <a href="/">Back to Groups</a>
     </div>
 
-    <h1>{{.Name}} ({{.Nationality}})</h1>
+    <h1>{{.Name}} (<a href="/country/{{urlquery .Nationality}}">{{.Nationality}}</a>)</h1>
     <p>Total Size: {{.Size}}</p>
 
     {{if .DirectMembers}}

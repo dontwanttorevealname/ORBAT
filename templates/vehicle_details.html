@@ -116,7 +116,7 @@
         <h2>Countries Using This Vehicle</h2>
         <div class="countries">
             {{range .Countries}}
-            <span class="country-tag">{{.}}</span>
+            <a href="/country/{{urlquery .}}" class="country-tag">{{.}}</a>
             {{end}}
         </div>
     </div>

@@ -63,8 +63,11 @@
     <h1>Military Order of Battle</h1>
     {{range .}}
     <div class="group">
+        <!-- Update the group info div to include a link to country details -->
         <div class="group-info">
-            <a href="/group/{{.ID}}">{{.Name}}</a> - {{.Nationality}} (Size: {{.Size}})
+            <a href="/group/{{.ID}}">{{.Name}}</a> - 
+            <a href="/country/{{.Nationality}}">{{.Nationality}}</a> 
+            (Size: {{.Size}})
         </div>
         <form method="POST" action="/group/{{.ID}}/delete" style="display: inline;" onsubmit="return confirmDelete('group')">
             <button type="submit" class="delete-btn">Delete</button>

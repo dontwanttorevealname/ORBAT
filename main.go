@@ -854,6 +854,63 @@ func main() {
         fmt.Fprintf(w, "OK")
     })
 
+    // Handler for country details and editing
+    http.HandleFunc("/country/", func(w http.ResponseWriter, r *http.Request) {
+        pathParts := strings.Split(r.URL.Path, "/")
+        if len(pathParts) < 3 {
+            http.NotFound(w, r)
+            return
+        }
+
+        countryName := pathParts[2]
+        
+        if r.Method == "POST" {
+            if err := r.ParseForm(); err != nil {
+                http.Error(w, err.Error(), http.StatusBadRequest)
+                return
+            }
+
+            newName := r.FormValue("name")
+            if newName == "" {
+                http.Error(w, "Country name cannot be empty", http.StatusBadRequest)
+                return
+            }
+
+            tx, err := db.Begin()
+            if err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+            defer tx.Rollback()
+
+            // Update country name in groups table
+            _, err = tx.Exec("UPDATE groups SET group_nationality = ? WHERE group_nationality = ?", 
+                newName, countryName)
+            if err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            if err := tx.Commit(); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+
+            http.Redirect(w, r, "/country/"+url.PathEscape(newName), http.StatusSeeOther)
+            return
+        }
+
+        details, err := getCountryDetails(db, countryName)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        if err := templates.ExecuteTemplate(w, "country_details.html", details); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+    })
+
     // Get port from environment variable
     port := os.Getenv("PORT")
     if port == "" {
@@ -1914,4 +1971,126 @@ func deleteVehicle(db *sql.DB, vehicleID string) error {
     }
 
     return tx.Commit()
+}
+
+
+type CountryDetails struct {
+    Name     string
+    Groups   []Group
+    Weapons  []WeaponUsage
+    Vehicles []VehicleUsage
+}
+
+type WeaponUsage struct {
+    Weapon
+    UserCount int
+}
+
+type VehicleUsage struct {
+    Vehicle
+    InstanceCount int
+}
+
+func getCountryDetails(db *sql.DB, countryName string) (CountryDetails, error) {
+    var details CountryDetails
+    details.Name = countryName
+
+    // Get groups from this country
+    groups, err := db.Query(`
+        SELECT group_id, group_name, group_nationality, group_size 
+        FROM groups 
+        WHERE group_nationality = ?
+        ORDER BY group_name`, countryName)
+    if err != nil {
+        return details, err
+    }
+    defer groups.Close()
+
+    for groups.Next() {
+        var g Group
+        if err := groups.Scan(&g.ID, &g.Name, &g.Nationality, &g.Size); err != nil {
+            return details, err
+        }
+        details.Groups = append(details.Groups, g)
+    }
+
+    // Get weapons used by this country's groups
+    weapons, err := db.Query(`
+        SELECT 
+            w.weapon_id,
+            w.weapon_name,
+            w.weapon_type,
+            w.weapon_caliber,
+            w.image_url,
+            COUNT(DISTINCT m.member_id) as user_count
+        FROM weapons w
+        JOIN members_weapons mw ON w.weapon_id = mw.weapon_id
+        JOIN members m ON mw.member_id = m.member_id
+        JOIN (
+            -- Direct group members
+            SELECT m.member_id, g.group_nationality
+            FROM members m
+            JOIN group_members gm ON m.member_id = gm.member_id
+            JOIN groups g ON gm.group_id = g.group_id
+            WHERE gm.team_id IS NULL
+            UNION ALL
+            -- Team members
+            SELECT m.member_id, g.group_nationality
+            FROM members m
+            JOIN team_members tm ON m.member_id = tm.member_id
+            JOIN group_members gm ON tm.team_id = gm.team_id
+            JOIN groups g ON gm.group_id = g.group_id
+            UNION ALL
+            -- Vehicle crew members
+            SELECT m.member_id, g.group_nationality
+            FROM members m
+            JOIN vehicle_members vm ON m.member_id = vm.member_id
+            JOIN group_vehicles gv ON vm.instance_id = gv.instance_id
+            JOIN groups g ON gv.group_id = g.group_id
+        ) membership ON m.member_id = membership.member_id
+        WHERE membership.group_nationality = ?
+        GROUP BY w.weapon_id
+        ORDER BY w.weapon_name`, countryName)
+    if err != nil {
+        return details, err
+    }
+    defer weapons.Close()
+
+    for weapons.Next() {
+        var w WeaponUsage
+        if err := weapons.Scan(&w.ID, &w.Name, &w.Type, &w.Caliber, &w.ImageURL, &w.UserCount); err != nil {
+            return details, err
+        }
+        details.Weapons = append(details.Weapons, w)
+    }
+
+    // Get vehicles used by this country's groups
+    vehicles, err := db.Query(`
+        SELECT 
+            v.vehicle_id,
+            v.vehicle_name,
+            v.vehicle_type,
+            v.vehicle_armament,
+            v.image_url,
+            COUNT(DISTINCT gv.instance_id) as instance_count
+        FROM vehicles v
+        JOIN group_vehicles gv ON v.vehicle_id = gv.vehicle_id
+        JOIN groups g ON gv.group_id = g.group_id
+        WHERE g.group_nationality = ?
+        GROUP BY v.vehicle_id
+        ORDER BY v.vehicle_name`, countryName)
+    if err != nil {
+        return details, err
+    }
+    defer vehicles.Close()
+
+    for vehicles.Next() {
+        var v VehicleUsage
+        if err := vehicles.Scan(&v.ID, &v.Name, &v.Type, &v.Armament, &v.ImageURL, &v.InstanceCount); err != nil {
+            return details, err
+        }
+        details.Vehicles = append(details.Vehicles, v)
+    }
+
+    return details, nil
 }

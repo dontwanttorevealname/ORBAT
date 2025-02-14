@@ -9,6 +9,7 @@ import (
     "html/template"
     "io"
     "net/http"
+    "net/url"
     "os"
     "path/filepath"
     "strings"
@@ -931,6 +932,25 @@ func main() {
         fmt.Printf("Fatal: Server error: %v\n", err)
         os.Exit(1)
     }
+
+        // Add new route for countries list
+    http.HandleFunc("/countries", func(w http.ResponseWriter, r *http.Request) {
+        countries, err := getCountries(db)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        tmpl, err := template.ParseFiles("templates/countries.html")
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        if err := tmpl.Execute(w, countries); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+    })
 }
 
 func weaponExists(db *sql.DB, name string) (bool, int, error) {
@@ -1992,15 +2012,21 @@ type VehicleUsage struct {
 }
 
 func getCountryDetails(db *sql.DB, countryName string) (CountryDetails, error) {
-    var details CountryDetails
-    details.Name = countryName
+    // URL decode the country name to handle spaces
+    decodedName, err := url.QueryUnescape(countryName)
+    if err != nil {
+        return CountryDetails{}, fmt.Errorf("invalid country name: %v", err)
+    }
 
-    // Get groups from this country
+    var details CountryDetails
+    details.Name = decodedName
+
+    // Update queries to use decoded name
     groups, err := db.Query(`
         SELECT group_id, group_name, group_nationality, group_size 
         FROM groups 
         WHERE group_nationality = ?
-        ORDER BY group_name`, countryName)
+        ORDER BY group_name`, decodedName)
     if err != nil {
         return details, err
     }
@@ -2093,4 +2119,26 @@ func getCountryDetails(db *sql.DB, countryName string) (CountryDetails, error) {
     }
 
     return details, nil
+}
+
+// Add new helper function to get all countries
+func getCountries(db *sql.DB) ([]string, error) {
+    rows, err := db.Query(`
+        SELECT DISTINCT group_nationality 
+        FROM groups 
+        ORDER BY group_nationality`)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var countries []string
+    for rows.Next() {
+        var country string
+        if err := rows.Scan(&country); err != nil {
+            return nil, err
+        }
+        countries = append(countries, country)
+    }
+    return countries, nil
 }

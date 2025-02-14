@@ -964,18 +964,20 @@ func getWeapons(db *sql.DB) ([]Weapon, error) {
     return weapons, nil
 }
 
-
 func getWeaponDetails(db *sql.DB, weaponID string) (WeaponDetails, error) {
     var details WeaponDetails
 
+    // Get weapon details
     err := db.QueryRow(`
         SELECT weapon_id, weapon_name, weapon_type, weapon_caliber, image_url 
         FROM weapons WHERE weapon_id = ?`, weaponID).Scan(
-        &details.Weapon.ID, &details.Weapon.Name, &details.Weapon.Type, &details.Weapon.Caliber, &details.Weapon.ImageURL)
+        &details.Weapon.ID, &details.Weapon.Name, &details.Weapon.Type, 
+        &details.Weapon.Caliber, &details.Weapon.ImageURL)
     if err != nil {
         return details, err
     }
 
+    // Get all users of this weapon and their group info
     rows, err := db.Query(`
         SELECT 
             g.group_id,
@@ -987,13 +989,20 @@ func getWeaponDetails(db *sql.DB, weaponID string) (WeaponDetails, error) {
         FROM members_weapons mw
         JOIN members m ON mw.member_id = m.member_id
         LEFT JOIN (
+            -- Direct group members
             SELECT member_id, group_id, NULL as team_id 
             FROM group_members 
             WHERE team_id IS NULL
             UNION ALL
+            -- Team members
             SELECT tm.member_id, gm.group_id, tm.team_id
             FROM team_members tm
             JOIN group_members gm ON tm.team_id = gm.team_id
+            UNION ALL
+            -- Vehicle crew members
+            SELECT vm.member_id, gv.group_id, NULL as team_id
+            FROM vehicle_members vm
+            JOIN group_vehicles gv ON vm.instance_id = gv.instance_id
         ) membership ON m.member_id = membership.member_id
         LEFT JOIN groups g ON membership.group_id = g.group_id
         LEFT JOIN teams t ON membership.team_id = t.team_id
@@ -1004,69 +1013,50 @@ func getWeaponDetails(db *sql.DB, weaponID string) (WeaponDetails, error) {
     }
     defer rows.Close()
 
-    groupMap := make(map[int]*WeaponGroupUsers)
-    countryMap := make(map[string]bool)
-    userCount := 0
+    var currentGroupUsers WeaponGroupUsers
+    details.Groups = make([]WeaponGroupUsers, 0)
+    countries := make(map[string]bool)
 
     for rows.Next() {
-        var groupID sql.NullInt64
-        var groupName sql.NullString
-        var nationality sql.NullString
-        var role string
-        var rank string
+        var groupID int
+        var groupName, nationality, role, rank string
         var teamName sql.NullString
-
+        
         err := rows.Scan(&groupID, &groupName, &nationality, &role, &rank, &teamName)
         if err != nil {
             return details, err
         }
 
-        user := WeaponUser{
-            Role: role,
-            Rank: rank,
-        }
-        if teamName.Valid {
-            user.TeamName = teamName.String
+        if currentGroupUsers.GroupID != groupID && currentGroupUsers.GroupID != 0 {
+            details.Groups = append(details.Groups, currentGroupUsers)
+            currentGroupUsers = WeaponGroupUsers{}
         }
 
-        gID := -1
-        gName := "Unassigned"
-        nat := "Unknown"
-        
-        if groupID.Valid {
-            gID = int(groupID.Int64)
-            gName = groupName.String
-            nat = nationality.String
-            countryMap[nat] = true
+        if currentGroupUsers.GroupID == 0 {
+            currentGroupUsers.GroupID = groupID
+            currentGroupUsers.GroupName = groupName
+            currentGroupUsers.Nationality = nationality
+            currentGroupUsers.Users = make([]WeaponUser, 0)
         }
 
-        if group, exists := groupMap[gID]; exists {
-            group.Users = append(group.Users, user)
-        } else {
-            groupMap[gID] = &WeaponGroupUsers{
-                GroupID:     gID,
-                GroupName:   gName,
-                Nationality: nat,
-                Users:      []WeaponUser{user},
-            }
-        }
-        userCount++
+        currentGroupUsers.Users = append(currentGroupUsers.Users, WeaponUser{
+            Role:     role,
+            Rank:     rank,
+            TeamName: teamName.String,
+        })
+
+        countries[nationality] = true
+        details.TotalUsers++
     }
 
-    details.TotalUsers = userCount
-    
-    for country := range countryMap {
+    if currentGroupUsers.GroupID != 0 {
+        details.Groups = append(details.Groups, currentGroupUsers)
+    }
+
+    details.CountryCount = len(countries)
+    details.Countries = make([]string, 0, len(countries))
+    for country := range countries {
         details.Countries = append(details.Countries, country)
-    }
-    details.CountryCount = len(details.Countries)
-    
-    for gid, group := range groupMap {
-        if gid != -1 {
-            details.Groups = append(details.Groups, *group)
-        }
-    }
-    if unassigned, exists := groupMap[-1]; exists {
-        details.Groups = append(details.Groups, *unassigned)
     }
 
     return details, nil

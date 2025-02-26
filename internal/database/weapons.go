@@ -62,10 +62,10 @@ func GetWeaponDetails(weaponID string) (models.WeaponDetails, error) {
 			g.group_nationality,
 			m.member_role,
 			m.member_rank,
-			t.team_name
+			COALESCE(t.team_name, '') as team_name
 		FROM members_weapons mw
 		JOIN members m ON mw.member_id = m.member_id
-		LEFT JOIN (
+		JOIN (
 			-- Direct group members
 			SELECT member_id, group_id, NULL as team_id 
 			FROM group_members 
@@ -81,7 +81,7 @@ func GetWeaponDetails(weaponID string) (models.WeaponDetails, error) {
 			FROM vehicle_members vm
 			JOIN group_vehicles gv ON vm.instance_id = gv.instance_id
 		) membership ON m.member_id = membership.member_id
-		LEFT JOIN groups g ON membership.group_id = g.group_id
+		JOIN groups g ON membership.group_id = g.group_id
 		LEFT JOIN teams t ON membership.team_id = t.team_id
 		WHERE mw.weapon_id = ?
 		ORDER BY g.group_name, t.team_name`, weaponID)

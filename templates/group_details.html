@@ -2,250 +2,269 @@
 <html>
 <head>
     <title>{{.Name}} - Details</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Optional Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .section {
-            margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .member, .team {
-            margin: 10px 0;
-            padding: 10px;
-            background: #f5f5f5;
-            border-radius: 4px;
-        }
-        h2, h3, h4 {
-            color: #333;
-            margin-top: 10px;
-            margin-bottom: 10px;
-        }
-        .weapons {
-            margin: 10px 0 10px 20px;
-            color: #666;
-            background: white;
-            padding: 8px;
-            border-radius: 4px;
-        }
-        .weapons div {
-            margin: 5px 0;
-        }
+        /* Custom styles can still be added here if needed */
         .weapon-link {
-            color: #0066cc;
             text-decoration: none;
         }
         .weapon-link:hover {
             text-decoration: underline;
         }
-        .weapons-form {
-            margin-top: 10px;
-        }
-        .weapons-form select {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-        }
-        .edit-weapons-btn {
-            background: #0066cc;
-            color: white;
-            padding: 5px 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.9em;
-            margin-top: 5px;
-        }
-        .edit-weapons-btn:hover {
-            background: #0052a3;
-        }
-        .weapons-dialog {
-            padding: 20px;
-            border-radius: 8px;
-            border: none;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .weapons-dialog::backdrop {
-            background: rgba(0, 0, 0, 0.5);
-        }
-        .delete-form {
-            margin-top: 20px;
-        }
-        .delete-btn {
-            background: #cc0000;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .delete-btn:hover {
-            background: #aa0000;
-        }
-        .nav {
-            margin-bottom: 20px;
-        }
-        .nav a {
-            color: #0066cc;
-            text-decoration: none;
-        }
-        .nav a:hover {
-            text-decoration: underline;
-        }
-        .vehicle {
-            margin: 15px 0;
-            padding: 15px;
-            background: #f5f5f5;
-            border-radius: 4px;
-        }
-        .crew {
-            margin: 10px 0 10px 20px;
-            padding: 10px;
-            background: white;
-            border-radius: 4px;
-        }
-        .crew .member {
-            margin: 8px 0;
-            padding: 10px;
-            background: #f9f9f9;
-            border-radius: 4px;
-        }
-        .vehicle h3 {
-            margin-bottom: 5px;
-        }
-        .vehicle p {
-            margin: 5px 0 10px 0;
-            color: #666;
-        }
-
-        .vehicle-link {
-        color: #0066cc;
-        text-decoration: none;
-        }
-        .vehicle-link:hover {
-            text-decoration: underline;
-        }
-        .edit-btn {
-            background: #0066cc;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            margin-right: 10px;
-        }
-        .edit-btn:hover {
-            background: #0052a3;
-        }
     </style>
 </head>
-<body>
-    <div class="nav">
-        <a href="/">Back to Groups</a>
-    </div>
+<body class="bg-light">
+    <div class="container py-4">
+        <!-- Navigation -->
+        <nav class="mb-4">
+            <a href="/" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-left"></i> Back to Groups
+            </a>
+        </nav>
 
-    <h1>{{.Name}} (<a href="/country/{{urlquery .Nationality}}">{{.Nationality}}</a>)</h1>
-    <p>Total Size: {{.Size}}</p>
-
-    {{if .DirectMembers}}
-    <div class="section">
-        <h2>Direct Members</h2>
-        {{range .DirectMembers}}
-        <div class="member">
-            <h3>{{.Role}} - {{.Rank}}</h3>
-            {{if .Weapons}}
-            <div class="weapons">
-                <strong>Weapons:</strong>
-                {{range .Weapons}}
-                <div><a href="/weapon/{{.ID}}" class="weapon-link">{{.Name}}</a> ({{.Type}}, {{.Caliber}})</div>
-                {{end}}
+        <!-- Header -->
+        <div class="mb-4">
+            <h1 class="display-5 mb-2">{{.Name}}</h1>
+            <div class="d-flex align-items-center gap-2">
+                <a href="/country/{{urlquery .Nationality}}" 
+                   class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-flag"></i> {{.Nationality}}
+                </a>
+                <span class="text-muted">Total Size: {{.Size}}</span>
             </div>
-            {{end}}
-            <button class="edit-weapons-btn" onclick="openWeaponsDialog('{{.ID}}')">Edit Weapons</button>
         </div>
-        {{end}}
-    </div>
-    {{end}}
 
-    {{if .Teams}}
-    <div class="section">
-        <h2>Teams</h2>
-        {{range .Teams}}
-        <div class="team">
-            <h3>{{.Name}} (Size: {{.Size}})</h3>
-            {{range .Members}}
-            <div class="member">
-                <h4>{{.Role}} - {{.Rank}}</h4>
-                {{if .Weapons}}
-                <div class="weapons">
-                    <strong>Weapons:</strong>
-                    {{range .Weapons}}
-                    <div><a href="/weapon/{{.ID}}" class="weapon-link">{{.Name}}</a> ({{.Type}}, {{.Caliber}})</div>
-                    {{end}}
-                </div>
-                {{end}}
-                <button class="edit-weapons-btn" onclick="openWeaponsDialog('{{.ID}}')">Edit Weapons</button>
-            </div>
+        <!-- Only show tabs if there's content -->
+        {{if or .DirectMembers .Teams .Vehicles}}
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-4" id="groupTabs" role="tablist">
+            {{if .DirectMembers}}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {{if not .Teams}}active{{end}}" 
+                        id="members-tab" 
+                        data-bs-toggle="tab" 
+                        data-bs-target="#members" 
+                        type="button" 
+                        role="tab">
+                    Direct Members
+                </button>
+            </li>
             {{end}}
-        </div>
-        {{end}}
-    </div>
-    {{end}}
+            {{if .Teams}}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" 
+                        id="teams-tab" 
+                        data-bs-toggle="tab" 
+                        data-bs-target="#teams" 
+                        type="button" 
+                        role="tab">
+                    Teams
+                </button>
+            </li>
+            {{end}}
+            {{if .Vehicles}}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {{if and (not .Teams) (not .DirectMembers)}}active{{end}}" 
+                        id="vehicles-tab" 
+                        data-bs-toggle="tab" 
+                        data-bs-target="#vehicles" 
+                        type="button" 
+                        role="tab">
+                    Vehicles
+                </button>
+            </li>
+            {{end}}
+        </ul>
 
-    {{if .Vehicles}}
-    <div class="section">
-        <h2>Vehicles</h2>
-        {{range .Vehicles}}
-        <div class="vehicle">
-            <h3><a href="/vehicle/{{.ID}}" class="vehicle-link">{{.Name}}</a> ({{.Type}})</h3>
-            <p>Armament: {{.Armament}}</p>
-            {{if .Crew}}
-            <div class="crew">
-                <h4>Crew:</h4>
-                {{range .Crew}}
-                <div class="member">
-                    <h4>{{.Role}} - {{.Rank}}</h4>
-                    {{if .Weapons}}
-                    <div class="weapons">
-                        <strong>Weapons:</strong>
-                        {{range .Weapons}}
-                        <div><a href="/weapon/{{.ID}}" class="weapon-link">{{.Name}}</a> ({{.Type}}, {{.Caliber}})</div>
-                        {{end}}
+        <!-- Tab Contents -->
+        <div class="tab-content" id="groupTabsContent">
+            {{if .DirectMembers}}
+            <!-- Direct Members Tab -->
+            <div class="tab-pane fade {{if not .Teams}}show active{{end}}" 
+                 id="members" 
+                 role="tabpanel">
+                <div class="row g-4">
+                    {{range .DirectMembers}}
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{.Role}} - {{.Rank}}</h5>
+                                {{if .Weapons}}
+                                <div class="card-text mb-3">
+                                    <h6 class="mb-2">Weapons:</h6>
+                                    {{range .Weapons}}
+                                    <div class="d-flex align-items-center gap-2 text-muted">
+                                        <a href="/weapon/{{.ID}}" class="weapon-link">{{.Name}}</a>
+                                        <small>({{.Type}}, {{.Caliber}})</small>
+                                    </div>
+                                    {{end}}
+                                </div>
+                                {{end}}
+                                <button onclick="openWeaponsDialog('{{.ID}}')"
+                                        class="btn btn-primary btn-sm">
+                                    <i class="bi bi-pencil"></i> Edit Weapons
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     {{end}}
-                    <button class="edit-weapons-btn" onclick="openWeaponsDialog('{{.ID}}')">Edit Weapons</button>
                 </div>
-                {{end}}
+            </div>
+            {{end}}
+
+            {{if .Teams}}
+            <!-- Teams Tab -->
+            <div class="tab-pane fade show active" 
+                 id="teams" 
+                 role="tabpanel">
+                <div class="row g-4">
+                    {{range .Teams}}
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    {{.Name}} 
+                                    <small class="text-muted">(Size: {{.Size}})</small>
+                                </h5>
+                                {{range .Members}}
+                                <div class="card mb-3">
+                                    <div class="card-body">
+                                        <h6>{{.Role}} - {{.Rank}}</h6>
+                                        {{if .Weapons}}
+                                        <div class="mb-3">
+                                            <strong class="mb-2 d-block">Weapons:</strong>
+                                            {{range .Weapons}}
+                                            <div class="d-flex align-items-center gap-2 text-muted">
+                                                <a href="/weapon/{{.ID}}" class="weapon-link">{{.Name}}</a>
+                                                <small>({{.Type}}, {{.Caliber}})</small>
+                                            </div>
+                                            {{end}}
+                                        </div>
+                                        {{end}}
+                                        <button onclick="openWeaponsDialog('{{.ID}}')"
+                                                class="btn btn-primary btn-sm">
+                                            <i class="bi bi-pencil"></i> Edit Weapons
+                                        </button>
+                                    </div>
+                                </div>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+
+            {{if .Vehicles}}
+            <!-- Vehicles Tab -->
+            <div class="tab-pane fade {{if and (not .Teams) (not .DirectMembers)}}show active{{end}}" 
+                 id="vehicles" 
+                 role="tabpanel">
+                <div class="row g-4">
+                    {{range .Vehicles}}
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <a href="/vehicle/{{.ID}}" class="weapon-link">{{.Name}}</a>
+                                    <small class="text-muted">({{.Type}})</small>
+                                </h5>
+                                <p class="text-muted">Armament: {{.Armament}}</p>
+                                
+                                {{if .Crew}}
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="mb-3">Crew Members:</h6>
+                                        {{range .Crew}}
+                                        <div class="card mb-3">
+                                            <div class="card-body">
+                                                <h6>{{.Role}} - {{.Rank}}</h6>
+                                                {{if .Weapons}}
+                                                <div class="mb-3">
+                                                    <strong class="mb-2 d-block">Weapons:</strong>
+                                                    {{range .Weapons}}
+                                                    <div class="d-flex align-items-center gap-2 text-muted">
+                                                        <a href="/weapon/{{.ID}}" class="weapon-link">{{.Name}}</a>
+                                                        <small>({{.Type}}, {{.Caliber}})</small>
+                                                    </div>
+                                                    {{end}}
+                                                </div>
+                                                {{end}}
+                                                <button onclick="openWeaponsDialog('{{.ID}}')"
+                                                        class="btn btn-primary btn-sm">
+                                                    <i class="bi bi-pencil"></i> Edit Weapons
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {{end}}
+                                    </div>
+                                </div>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
             </div>
             {{end}}
         </div>
+        {{else}}
+        <!-- Show when no content exists -->
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> This group has no members, teams, or vehicles assigned yet.
+        </div>
         {{end}}
+
+        <!-- Action Buttons -->
+        <div class="mt-4">
+            <a href="/group/{{.ID}}/edit" class="btn btn-primary me-2">
+                <i class="bi bi-pencil"></i> Edit Group
+            </a>
+            <form method="POST" action="/group/{{.ID}}/delete" 
+                  onsubmit="return confirmDelete('group')" 
+                  class="d-inline">
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Delete Group
+                </button>
+            </form>
+        </div>
+
+        <!-- Weapons Dialog -->
+        <div class="modal fade" id="weaponsDialog" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Weapons</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form method="POST" id="weaponsForm">
+                            <div id="weaponSelects" class="mb-3"></div>
+                            <div class="d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    Cancel
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    Save Changes
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    {{end}}
 
-    <form class="delete-form" method="POST" action="/group/{{.ID}}/delete" 
-          onsubmit="return confirmDelete('group')">
-        <a href="/group/{{.ID}}/edit" class="edit-btn">Edit Group</a>
-        <button type="submit" class="delete-btn">Delete Group</button>
-    </form>
-
-    <dialog class="weapons-dialog" id="weaponsDialog">
-        <form method="POST" id="weaponsForm">
-            <div id="weaponSelects"></div>
-            <button type="submit" class="edit-weapons-btn">Save</button>
-            <button type="button" onclick="closeDialog()" style="margin-left: 10px;">Cancel</button>
-        </form>
-    </dialog>
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        const dialog = document.getElementById('weaponsDialog');
+        const modal = new bootstrap.Modal(document.getElementById('weaponsDialog'));
         const form = document.getElementById('weaponsForm');
 
         async function openWeaponsDialog(memberId) {
@@ -262,6 +281,7 @@
                 container.innerHTML = '';
                 
                 const select = document.createElement('select');
+                select.className = 'form-select';
                 select.name = 'weapons[]';
                 select.multiple = true;
                 select.size = 10;
@@ -278,22 +298,12 @@
                 });
                 
                 container.appendChild(select);
-                dialog.showModal();
+                modal.show();
             } catch (error) {
                 console.error('Error fetching weapons:', error);
                 alert('There was an error loading the weapons. Please try again.');
             }
         }
-        
-        function closeDialog() {
-            dialog.close();
-        }
-    
-        dialog.addEventListener('click', (e) => {
-            if (e.target === dialog) {
-                closeDialog();
-            }
-        });
 
         function confirmDelete(type) {
             if (!confirm(`Are you sure you want to delete this ${type}? This action cannot be undone.`)) {

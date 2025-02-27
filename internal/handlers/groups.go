@@ -3,8 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
+	"text/template"
 
 	"orbat/internal/database"
 )
@@ -16,14 +18,18 @@ func GroupsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get groups data
 	groups, err := database.GetGroups()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to fetch groups", http.StatusInternalServerError)
 		return
 	}
 
-	if err := templates.ExecuteTemplate(w, "groups.html", groups); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// Render template without extra WriteHeader
+	tmpl := template.Must(template.ParseFiles("templates/groups.html"))
+	if err := tmpl.Execute(w, groups); err != nil {
+		log.Printf("Template execution error: %v", err)
+		// Don't write header here since template.Execute might have already written it
 	}
 }
 

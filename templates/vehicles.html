@@ -2,154 +2,117 @@
 <html>
 <head>
     <title>Vehicles List</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .vehicle {
-            margin: 10px 0;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .add-form {
-            margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: #f5f5f5;
-        }
-        .form-group {
-            margin: 10px 0;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        input[type="text"] {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button {
-            background: #0066cc;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #0052a3;
-        }
-        .delete-btn {
-            background: #cc0000;
-        }
-        .delete-btn:hover {
-            background: #aa0000;
-        }
-        .nav {
-            margin-bottom: 20px;
-        }
-        .nav a {
-            color: #0066cc;
-            text-decoration: none;
-        }
-        .nav a:hover {
-            text-decoration: underline;
-        }
-        .image-indicator {
-            font-size: 0.8em;
-            color: #666;
-            margin-left: 10px;
-        }
-        .vehicle-info {
-            flex-grow: 1;
-        }
-        .help-text {
-            font-size: 0.8em;
-            color: #666;
-            margin-top: 5px;
-        }
-        input[type="file"] {
-            padding: 8px 0;
-        }
-        .error-message {
-            color: #cc0000;
-            margin-top: 5px;
-            display: none;
-        }
-        a {
-            color: #0066cc;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
-<body>
-    <div class="nav">
-        <a href="/">Back to Groups</a>
-    </div>
-    
-    <h1>Vehicles List</h1>
+<body class="bg-light">
+    <div class="container py-4">
+        <!-- Navigation -->
+        <nav class="mb-4">
+            <a href="/" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-left"></i> Back to Groups
+            </a>
+        </nav>
+        
+        <h1 class="display-5 mb-4">Vehicles List</h1>
 
-    <div class="add-form">
-        <h2>Add New Vehicle</h2>
-        <form id="vehicleForm" method="POST" action="/vehicles" enctype="multipart/form-data">
-            <div class="form-group">
-                <label for="name">Vehicle Name:</label>
-                <input type="text" id="name" name="name" required>
-                <div id="nameError" class="error-message"></div>
-            </div>
-            <div class="form-group">
-                <label for="type">Vehicle Type:</label>
-                <input type="text" id="type" name="type" required>
-            </div>
-            <div class="form-group">
-                <label for="armament">Armament:</label>
-                <input type="text" id="armament" name="armament" placeholder="None">
-            </div>
-            <div class="form-group">
-                <label for="image">Vehicle Image:</label>
-                <input type="file" id="image" name="image" accept="image/*">
-                <p class="help-text">Supported formats: JPG, PNG, GIF. Max size: 5MB</p>
-            </div>
-            <button type="submit">Add Vehicle</button>
-        </form>
-    </div>
+        <div class="alert alert-info mb-4">
+            <i class="bi bi-info-circle me-2"></i>
+            Note: Vehicle color schemes, markings, and configurations may vary between different units.
+        </div>
 
-    <h2>Current Vehicles</h2>
-    {{range .}}
-    <div class="vehicle">
-        <div class="vehicle-info">
-            <a href="/vehicle/{{.ID}}">{{.Name}}</a> - {{.Type}}
-            {{if .Armament}}({{.Armament}}){{end}}
-            {{if and .ImageURL.Valid .ImageURL.String}}
-            <span class="image-indicator">(Has Image)</span>
+        <!-- Add New Vehicle Form -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Add New Vehicle</h2>
+            </div>
+            <div class="card-body">
+                <form id="vehicleForm" method="POST" action="/vehicles" enctype="multipart/form-data">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="name" class="form-label">Vehicle Name</label>
+                            <input type="text" id="name" name="name" class="form-control" required>
+                            <div id="nameError" class="invalid-feedback"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="type" class="form-label">Vehicle Type</label>
+                            <input type="text" id="type" name="type" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="armament" class="form-label">Armament</label>
+                            <input type="text" id="armament" name="armament" class="form-control" placeholder="None">
+                        </div>
+                        <div class="col-12">
+                            <label for="image" class="form-label">Vehicle Image</label>
+                            <input type="file" id="image" name="image" class="form-control" accept="image/*">
+                            <div class="form-text">Supported formats: JPG, PNG, GIF. Max size: 5MB</div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Add Vehicle
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Vehicles List -->
+        <div class="row g-4">
+            {{range .}}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100">
+                    {{if and .ImageURL.Valid .ImageURL.String}}
+                    <div class="card-img-top position-relative" style="height: 150px; overflow: hidden;">
+                        <img src="{{.ImageURL.String}}" 
+                             alt="{{.Name}}"
+                             class="position-absolute top-50 start-50 translate-middle"
+                             style="max-width: 100%; max-height: 150px; object-fit: contain;">
+                    </div>
+                    {{end}}
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <a href="/vehicle/{{.ID}}" class="text-decoration-none">{{.Name}}</a>
+                        </h5>
+                        <p class="card-text">
+                            <span class="badge bg-secondary">{{.Type}}</span>
+                            {{if .Armament}}
+                            <span class="text-muted d-block mt-2">
+                                <i class="bi bi-gear"></i> {{.Armament}}
+                            </span>
+                            {{end}}
+                        </p>
+                    </div>
+                    <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+                        <a href="/vehicle/{{.ID}}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-box-arrow-right"></i> Details
+                        </a>
+                        <form method="POST" action="/vehicle/{{.ID}}/delete" 
+                              onsubmit="return confirmDelete('vehicle')" 
+                              class="d-inline">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
             {{end}}
         </div>
-        <form method="POST" action="/vehicle/{{.ID}}/delete" style="display: inline;" onsubmit="return confirmDelete('vehicle')">
-            <button type="submit" class="delete-btn">Delete</button>
-        </form>
     </div>
-    {{end}}
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         document.getElementById('vehicleForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            // Reset error message
-            document.getElementById('nameError').style.display = 'none';
+            const nameError = document.getElementById('nameError');
+            const nameInput = document.getElementById('name');
+            nameInput.classList.remove('is-invalid');
             
             const formData = new FormData(this);
             
@@ -170,21 +133,19 @@
                         });
                         
                         if (replaceResponse.ok) {
-                            window.location.href = '/vehicles';
+                            window.location.reload();
                             return;
                         } else {
                             throw new Error('Failed to replace vehicle');
                         }
                     } else {
-                        // Show error message and let user modify the name
-                        const nameError = document.getElementById('nameError');
+                        nameInput.classList.add('is-invalid');
                         nameError.textContent = 'Please choose a different name for the vehicle.';
-                        nameError.style.display = 'block';
-                        document.getElementById('name').focus();
+                        nameInput.focus();
                         return;
                     }
                 } else if (response.ok) {
-                    window.location.href = '/vehicles';
+                    window.location.reload();
                     return;
                 } else {
                     const errorText = await response.text();

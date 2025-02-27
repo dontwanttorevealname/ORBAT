@@ -2,127 +2,105 @@
 <html>
 <head>
     <title>Edit Group</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .section {
-            margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: #f5f5f5;
-        }
-        .member-form, .team-form, .vehicle-form {
-            margin: 10px 0;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background: white;
-        }
-        .form-group {
-            margin: 10px 0;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        input[type="text"], select {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button {
-            background: #0066cc;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 5px;
-        }
-        button.remove {
-            background: #cc0000;
-        }
-        button:hover {
-            opacity: 0.9;
-        }
-        .weapon-select {
-            margin: 5px 0;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .weapon-select select {
-            flex-grow: 1;
-        }
-        .nav {
-            margin-bottom: 20px;
-        }
-        .nav a {
-            color: #0066cc;
-            text-decoration: none;
-        }
-        .nav a:hover {
-            text-decoration: underline;
-        }
-        .vehicle-crew {
-            margin-left: 20px;
-            padding: 10px;
-            border-left: 2px solid #eee;
-        }
-        .team-members {
-            margin-left: 20px;
-            padding: 10px;
-            border-left: 2px solid #eee;
-        }
-    </style>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
-<body>
-    <div class="nav">
-        <a href="/">Back to Groups</a>
+<body class="bg-light">
+    <div class="container py-4">
+        <!-- Navigation -->
+        <nav class="mb-4">
+            <a href="/" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-left"></i> Back to Groups
+            </a>
+        </nav>
+
+        <h1 class="display-5 mb-4">Edit Group</h1>
+        
+        <form id="groupForm" method="POST">
+            <input type="hidden" id="group_id" name="group_id">
+            
+            <!-- Group Details Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Group Details</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">Group Name</label>
+                            <input type="text" id="name" name="name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="nationality" class="form-label">Nationality</label>
+                            <input type="text" id="nationality" name="nationality" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Tabs -->
+            <ul class="nav nav-tabs mb-4" id="groupTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="members-tab" data-bs-toggle="tab" data-bs-target="#members" type="button" role="tab">
+                        <i class="bi bi-person"></i> Direct Members
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="teams-tab" data-bs-toggle="tab" data-bs-target="#teams" type="button" role="tab">
+                        <i class="bi bi-people"></i> Teams
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="vehicles-tab" data-bs-toggle="tab" data-bs-target="#vehicles" type="button" role="tab">
+                        <i class="bi bi-truck"></i> Vehicles
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="groupTabsContent">
+                <!-- Direct Members Tab -->
+                <div class="tab-pane fade show active" id="members" role="tabpanel">
+                    <div class="d-flex justify-content-end mb-3">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addMember('directMembers')">
+                            <i class="bi bi-plus-circle"></i> Add Member
+                        </button>
+                    </div>
+                    <div id="directMembers"></div>
+                </div>
+
+                <!-- Teams Tab -->
+                <div class="tab-pane fade" id="teams" role="tabpanel">
+                    <div class="d-flex justify-content-end mb-3">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addTeam()">
+                            <i class="bi bi-plus-circle"></i> Add Team
+                        </button>
+                    </div>
+                    <div id="teams" class="accordion"></div>
+                </div>
+
+                <!-- Vehicles Tab -->
+                <div class="tab-pane fade" id="vehicles" role="tabpanel">
+                    <div class="d-flex justify-content-end mb-3">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addVehicle()">
+                            <i class="bi bi-plus-circle"></i> Add Vehicle
+                        </button>
+                    </div>
+                    <div id="vehicles" class="accordion"></div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-circle"></i> Update Group
+                </button>
+            </div>
+        </form>
     </div>
 
-    <h1>Edit Group</h1>
-    <form id="groupForm" method="POST">
-        <input type="hidden" id="group_id" name="group_id">
-        <div class="section">
-            <h2>Group Details</h2>
-            <div class="form-group">
-                <label for="name">Group Name:</label>
-                <input type="text" id="name" name="name" required>
-            </div>
-            <div class="form-group">
-                <label for="nationality">Nationality:</label>
-                <input type="text" id="nationality" name="nationality" required>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>Direct Members</h2>
-            <div id="directMembers"></div>
-            <button type="button" onclick="addMember('directMembers')">Add Member</button>
-        </div>
-
-        <div class="section">
-            <h2>Teams</h2>
-            <div id="teams"></div>
-            <button type="button" onclick="addTeam()">Add Team</button>
-        </div>
-
-        <div class="section">
-            <h2>Vehicles</h2>
-            <div id="vehicles"></div>
-            <button type="button" onclick="addVehicle()">Add Vehicle</button>
-        </div>
-
-        <button type="submit">Update Group</button>
-    </form>
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         // Parse the data from the server
@@ -164,26 +142,34 @@
         function addMember(containerId, memberData = null) {
             let container = document.getElementById(containerId);
             let memberDiv = document.createElement('div');
-            memberDiv.className = 'member-form';
+            memberDiv.className = 'card mb-3';
             
             let memberIndex = container.children.length;
             let namePrefix = containerId === 'directMembers' ? '' : `team_${container.dataset.teamIndex}_`;
             
             memberDiv.innerHTML = `
-                <div class="form-group">
-                    <label>Role:</label>
-                    <input type="text" name="${namePrefix}role[]" value="${memberData ? memberData.Role : ''}" required>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Role</label>
+                            <input type="text" name="${namePrefix}role[]" class="form-control" value="${memberData ? memberData.Role : ''}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Rank</label>
+                            <input type="text" name="${namePrefix}rank[]" class="form-control" value="${memberData ? memberData.Rank : ''}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Weapons</label>
+                            <div class="weapon-selects mb-2"></div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addWeaponSelect(this, '${namePrefix}weapons_${memberIndex}')">
+                                <i class="bi bi-plus-circle"></i> Add Weapon
+                            </button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm mt-3" onclick="this.closest('.card').remove()">
+                        <i class="bi bi-trash"></i> Remove Member
+                    </button>
                 </div>
-                <div class="form-group">
-                    <label>Rank:</label>
-                    <input type="text" name="${namePrefix}rank[]" value="${memberData ? memberData.Rank : ''}" required>
-                </div>
-                <div class="form-group">
-                    <label>Weapons:</label>
-                    <div class="weapon-selects"></div>
-                    <button type="button" onclick="addWeaponSelect(this, '${namePrefix}weapons_${memberIndex}')">Add Weapon</button>
-                </div>
-                <button type="button" class="remove" onclick="this.parentElement.remove()">Remove Member</button>
             `;
             
             container.appendChild(memberDiv);
@@ -204,21 +190,44 @@
             let container = document.getElementById('teams');
             let teamIndex = container.children.length;
             let teamDiv = document.createElement('div');
-            teamDiv.className = 'section';
+            teamDiv.className = 'accordion-item mb-3 border border-2 border-secondary-subtle rounded-3';
             
             teamDiv.innerHTML = `
-                <div class="form-group">
-                    <label>Team Name:</label>
-                    <input type="text" name="team_name[]" value="${teamData ? teamData.Name : ''}" required>
+                <h2 class="accordion-header d-flex align-items-center bg-light border-bottom rounded-top">
+                    <div class="accordion-button py-2" style="cursor: default; border: none; box-shadow: none;">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1">
+                            <input type="text" name="team_name[]" class="form-control form-control-sm" 
+                                   value="${teamData ? teamData.Name : ''}" 
+                                   placeholder="Team Name"
+                                   style="width: 200px;"
+                                   required>
+                            <span class="badge bg-secondary">Members: <span class="member-count">0</span></span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" 
+                            onclick="toggleCollapse(this, 'team${teamIndex}')">
+                        Collapse
+                    </button>
+                </h2>
+                <div id="team${teamIndex}" class="accordion-collapse collapse show">
+                    <div class="accordion-body">
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-primary btn-sm" 
+                                    onclick="addMember('team_${teamIndex}_members')">
+                                <i class="bi bi-plus-circle"></i> Add Team Member
+                            </button>
+                        </div>
+                        <div id="team_${teamIndex}_members" data-team-index="${teamIndex}" class="ps-4 border-start border-2"></div>
+                        <button type="button" class="btn btn-outline-danger btn-sm mt-3" 
+                                onclick="this.closest('.accordion-item').remove()">
+                            <i class="bi bi-trash"></i> Remove Team
+                        </button>
+                    </div>
                 </div>
-                <div class="team-members" id="team_${teamIndex}_members" data-team-index="${teamIndex}"></div>
-                <button type="button" onclick="addMember('team_${teamIndex}_members')">Add Team Member</button>
-                <button type="button" class="remove" onclick="this.parentElement.remove()">Remove Team</button>
             `;
             
             container.appendChild(teamDiv);
             
-            // Add team members if data exists
             if (teamData && teamData.Members) {
                 let membersContainer = document.getElementById(`team_${teamIndex}_members`);
                 membersContainer.dataset.teamIndex = teamIndex;
@@ -227,40 +236,79 @@
                     addMember(`team_${teamIndex}_members`, member);
                 });
             }
+
+            // Update member count when members are added or removed
+            const updateMemberCount = () => {
+                const memberCount = document.getElementById(`team_${teamIndex}_members`).children.length;
+                teamDiv.querySelector('.member-count').textContent = memberCount;
+            };
+
+            const observer = new MutationObserver(updateMemberCount);
+            observer.observe(document.getElementById(`team_${teamIndex}_members`), { childList: true });
+            updateMemberCount();
         }
 
         function addVehicle(vehicleData = null) {
             let container = document.getElementById('vehicles');
             let vehicleIndex = container.children.length;
-            
             let vehicleDiv = document.createElement('div');
-            vehicleDiv.className = 'vehicle-form';
+            vehicleDiv.className = 'accordion-item mb-3 border border-2 border-secondary-subtle rounded-3';
             
             vehicleDiv.innerHTML = `
-                <div class="form-group">
-                    <label>Vehicle:</label>
-                    <select name="vehicle_id[]" required>
-                        ${vehicleOptions.map(v => 
-                            `<option value="${v.ID}" ${vehicleData && v.ID == vehicleData.ID ? 'selected' : ''}>${v.Name} (${v.Type})</option>`
-                        ).join('')}
-                    </select>
+                <h2 class="accordion-header d-flex align-items-center bg-light border-bottom rounded-top">
+                    <div class="accordion-button py-2" style="cursor: default; border: none; box-shadow: none;">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1">
+                            <select name="vehicle_id[]" class="form-select form-select-sm" 
+                                    style="width: 200px;"
+                                    required>
+                                ${vehicleOptions.map(v => 
+                                    `<option value="${v.ID}" ${vehicleData && v.ID == vehicleData.ID ? 'selected' : ''}>
+                                        ${v.Name} (${v.Type})
+                                    </option>`
+                                ).join('')}
+                            </select>
+                            <span class="badge bg-secondary">Crew: <span class="crew-count">0</span></span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" 
+                            onclick="toggleCollapse(this, 'vehicle${vehicleIndex}')">
+                        Collapse
+                    </button>
+                </h2>
+                <div id="vehicle${vehicleIndex}" class="accordion-collapse collapse show">
+                    <div class="accordion-body">
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-primary btn-sm" 
+                                    onclick="addVehicleMember(${vehicleIndex})">
+                                <i class="bi bi-plus-circle"></i> Add Crew Member
+                            </button>
+                        </div>
+                        <div id="vehicle_${vehicleIndex}_members" class="ps-4 border-start border-2"></div>
+                        <button type="button" class="btn btn-outline-danger btn-sm mt-3" 
+                                onclick="this.closest('.accordion-item').remove()">
+                            <i class="bi bi-trash"></i> Remove Vehicle
+                        </button>
+                    </div>
                 </div>
-                <div class="vehicle-crew">
-                    <h4>Crew Members</h4>
-                    <div id="vehicle_${vehicleIndex}_members"></div>
-                    <button type="button" onclick="addVehicleMember(${vehicleIndex})">Add Crew Member</button>
-                </div>
-                <button type="button" class="remove" onclick="this.parentElement.remove()">Remove Vehicle</button>
             `;
             
             container.appendChild(vehicleDiv);
             
-            // Add crew members if data exists
             if (vehicleData && vehicleData.Crew) {
                 vehicleData.Crew.forEach(member => {
                     addVehicleMember(vehicleIndex, member);
                 });
             }
+
+            // Update crew count when members are added or removed
+            const updateCrewCount = () => {
+                const crewCount = document.getElementById(`vehicle_${vehicleIndex}_members`).children.length;
+                vehicleDiv.querySelector('.crew-count').textContent = crewCount;
+            };
+
+            const observer = new MutationObserver(updateCrewCount);
+            observer.observe(document.getElementById(`vehicle_${vehicleIndex}_members`), { childList: true });
+            updateCrewCount();
         }
 
         function addVehicleMember(vehicleIndex, memberData = null) {
@@ -268,23 +316,31 @@
             let memberIndex = container.children.length;
             
             let memberDiv = document.createElement('div');
-            memberDiv.className = 'member-form';
+            memberDiv.className = 'card mb-3';
             
             memberDiv.innerHTML = `
-                <div class="form-group">
-                    <label>Role:</label>
-                    <input type="text" name="vehicle_${vehicleIndex}_role[]" value="${memberData ? memberData.Role : ''}" required>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Role</label>
+                            <input type="text" name="vehicle_${vehicleIndex}_role[]" class="form-control" value="${memberData ? memberData.Role : ''}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Rank</label>
+                            <input type="text" name="vehicle_${vehicleIndex}_rank[]" class="form-control" value="${memberData ? memberData.Rank : ''}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Weapons</label>
+                            <div class="weapon-selects mb-2"></div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addWeaponSelect(this, 'vehicle_${vehicleIndex}_weapons_${memberIndex}')">
+                                <i class="bi bi-plus-circle"></i> Add Weapon
+                            </button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm mt-3" onclick="this.closest('.card').remove()">
+                        <i class="bi bi-trash"></i> Remove Member
+                    </button>
                 </div>
-                <div class="form-group">
-                    <label>Rank:</label>
-                    <input type="text" name="vehicle_${vehicleIndex}_rank[]" value="${memberData ? memberData.Rank : ''}" required>
-                </div>
-                <div class="form-group">
-                    <label>Weapons:</label>
-                    <div class="weapon-selects"></div>
-                    <button type="button" onclick="addWeaponSelect(this, 'vehicle_${vehicleIndex}_weapons_${memberIndex}')">Add Weapon</button>
-                </div>
-                <button type="button" class="remove" onclick="this.parentElement.remove()">Remove Member</button>
             `;
             
             container.appendChild(memberDiv);
@@ -304,9 +360,10 @@
         function addWeaponSelect(buttonElement, namePrefix, selectedWeaponID = null) {
             let container = buttonElement.parentElement.querySelector('.weapon-selects');
             let weaponDiv = document.createElement('div');
-            weaponDiv.className = 'weapon-select';
+            weaponDiv.className = 'input-group mb-2';
             
             let select = document.createElement('select');
+            select.className = 'form-select';
             select.name = namePrefix ? `${namePrefix}[]` : 'weapons[]';
             select.required = true;
             
@@ -320,18 +377,33 @@
                 select.appendChild(option);
             });
             
-            weaponDiv.appendChild(select);
-            
             let removeButton = document.createElement('button');
             removeButton.type = 'button';
-            removeButton.className = 'remove';
-            removeButton.textContent = 'Remove';
+            removeButton.className = 'btn btn-outline-danger';
+            removeButton.innerHTML = '<i class="bi bi-trash"></i>';
             removeButton.onclick = function() {
                 weaponDiv.remove();
             };
             
+            weaponDiv.appendChild(select);
             weaponDiv.appendChild(removeButton);
             container.appendChild(weaponDiv);
+        }
+
+        // Add this new function to handle the collapse/expand toggle
+        function toggleCollapse(button, targetId) {
+            const targetElement = document.getElementById(targetId);
+            if (!targetElement) return;
+            
+            const isCollapsed = !targetElement.classList.contains('show');
+            
+            if (isCollapsed) {
+                targetElement.classList.add('show');
+                button.textContent = 'Collapse';
+            } else {
+                targetElement.classList.remove('show');
+                button.textContent = 'Expand';
+            }
         }
     </script>
 </body>

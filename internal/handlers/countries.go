@@ -6,18 +6,24 @@ import (
 	"strings"
 
 	"orbat/internal/database"
+	"html/template"
+	"log"
 )
 
 // CountriesHandler handles the countries list
 func CountriesHandler(w http.ResponseWriter, r *http.Request) {
+	// Get countries data
 	countries, err := database.GetCountries()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to fetch countries", http.StatusInternalServerError)
 		return
 	}
 
-	if err := templates.ExecuteTemplate(w, "countries.html", countries); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// Render template without extra WriteHeader
+	tmpl := template.Must(template.ParseFiles("templates/countries.html"))
+	if err := tmpl.Execute(w, countries); err != nil {
+		log.Printf("Template execution error: %v", err)
+		// Don't write header here since template.Execute might have already written it
 	}
 }
 

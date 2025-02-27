@@ -83,16 +83,31 @@ func AddGroupHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Convert data to JSON for the template
+		weaponsJSON, err := json.Marshal(weapons)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		vehiclesJSON, err := json.Marshal(vehicles)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		data := struct {
-			WeaponOptions  []interface{}
-			VehicleOptions []interface{}
+			Weapons        interface{}
+			WeaponOptions string
+			VehicleOptions string
 		}{
-			WeaponOptions:  interfaceSlice(weapons),
-			VehicleOptions: interfaceSlice(vehicles),
+			Weapons:        weapons,  // For the template weapon select
+			WeaponOptions: string(weaponsJSON),  // For JavaScript
+			VehicleOptions: string(vehiclesJSON), // For JavaScript
 		}
 
 		if err := templates.ExecuteTemplate(w, "add_group.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("Template execution error: %v", err)
 		}
 		return
 	}

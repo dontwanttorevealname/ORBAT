@@ -43,17 +43,17 @@
             <!-- Content Tabs -->
             <ul class="nav nav-tabs mb-4" id="groupTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="members-tab" data-bs-toggle="tab" data-bs-target="#members" type="button" role="tab">
+                    <button class="nav-link active" id="members-tab" data-bs-toggle="tab" data-bs-target="#membersContent" type="button" role="tab">
                         <i class="bi bi-person"></i> Direct Members
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="teams-tab" data-bs-toggle="tab" data-bs-target="#teams" type="button" role="tab">
+                    <button class="nav-link" id="teams-tab" data-bs-toggle="tab" data-bs-target="#teamsContent" type="button" role="tab">
                         <i class="bi bi-people"></i> Teams
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="vehicles-tab" data-bs-toggle="tab" data-bs-target="#vehicles" type="button" role="tab">
+                    <button class="nav-link" id="vehicles-tab" data-bs-toggle="tab" data-bs-target="#vehiclesContent" type="button" role="tab">
                         <i class="bi bi-truck"></i> Vehicles
                     </button>
                 </li>
@@ -61,7 +61,7 @@
 
             <div class="tab-content" id="groupTabsContent">
                 <!-- Direct Members Tab -->
-                <div class="tab-pane fade show active" id="members" role="tabpanel">
+                <div class="tab-pane fade show active" id="membersContent" role="tabpanel">
                     <div class="d-flex justify-content-end mb-3">
                         <button type="button" class="btn btn-primary btn-sm" onclick="addMember('directMembers')">
                             <i class="bi bi-plus-circle"></i> Add Member
@@ -71,23 +71,23 @@
                 </div>
 
                 <!-- Teams Tab -->
-                <div class="tab-pane fade" id="teams" role="tabpanel">
+                <div class="tab-pane fade" id="teamsContent" role="tabpanel">
                     <div class="d-flex justify-content-end mb-3">
                         <button type="button" class="btn btn-primary btn-sm" onclick="addTeam()">
                             <i class="bi bi-plus-circle"></i> Add Team
                         </button>
                     </div>
-                    <div id="teams" class="accordion"></div>
+                    <div id="teamsContainer" class="accordion"></div>
                 </div>
 
                 <!-- Vehicles Tab -->
-                <div class="tab-pane fade" id="vehicles" role="tabpanel">
+                <div class="tab-pane fade" id="vehiclesContent" role="tabpanel">
                     <div class="d-flex justify-content-end mb-3">
                         <button type="button" class="btn btn-primary btn-sm" onclick="addVehicle()">
                             <i class="bi bi-plus-circle"></i> Add Vehicle
                         </button>
                     </div>
-                    <div id="vehicles" class="accordion"></div>
+                    <div id="vehiclesContainer" class="accordion"></div>
                 </div>
             </div>
 
@@ -187,7 +187,7 @@
         }
 
         function addTeam(teamData = null) {
-            let container = document.getElementById('teams');
+            let container = document.getElementById('teamsContainer');
             let teamIndex = container.children.length;
             let teamDiv = document.createElement('div');
             teamDiv.className = 'accordion-item mb-3 border border-2 border-secondary-subtle rounded-3';
@@ -249,7 +249,7 @@
         }
 
         function addVehicle(vehicleData = null) {
-            let container = document.getElementById('vehicles');
+            let container = document.getElementById('vehiclesContainer');
             let vehicleIndex = container.children.length;
             let vehicleDiv = document.createElement('div');
             vehicleDiv.className = 'accordion-item mb-3 border border-2 border-secondary-subtle rounded-3';

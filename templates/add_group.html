@@ -19,10 +19,10 @@
         <h1 class="display-5 mb-4">Add New Group</h1>
 
         <form method="POST" action="/add_group">
-            <!-- Basic Info Section -->
+            <!-- Group Details Card -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <h2 class="h5 mb-0">Basic Information</h2>
+                    <h2 class="h5 mb-0">Group Details</h2>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
@@ -38,48 +38,62 @@
                 </div>
             </div>
 
-            <!-- Direct Members Section -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h2 class="h5 mb-0">Direct Members</h2>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="addDirectMember()">
-                        <i class="bi bi-plus-circle"></i> Add Member
+            <!-- Content Tabs -->
+            <ul class="nav nav-tabs mb-4" id="groupTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="members-tab" data-bs-toggle="tab" data-bs-target="#membersContent" type="button" role="tab">
+                        <i class="bi bi-person"></i> Direct Members
                     </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="teams-tab" data-bs-toggle="tab" data-bs-target="#teamsContent" type="button" role="tab">
+                        <i class="bi bi-people"></i> Teams
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="vehicles-tab" data-bs-toggle="tab" data-bs-target="#vehiclesContent" type="button" role="tab">
+                        <i class="bi bi-truck"></i> Vehicles
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="groupTabsContent">
+                <!-- Direct Members Tab -->
+                <div class="tab-pane fade show active" id="membersContent" role="tabpanel">
+                    <div class="d-flex justify-content-end mb-3">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addMember('directMembers')">
+                            <i class="bi bi-plus-circle"></i> Add Member
+                        </button>
+                    </div>
+                    <div id="directMembers"></div>
                 </div>
-                <div class="card-body">
-                    <div id="direct_members"></div>
+
+                <!-- Teams Tab -->
+                <div class="tab-pane fade" id="teamsContent" role="tabpanel">
+                    <div class="d-flex justify-content-end mb-3">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addTeam()">
+                            <i class="bi bi-plus-circle"></i> Add Team
+                        </button>
+                    </div>
+                    <div id="teamsContainer" class="accordion"></div>
+                </div>
+
+                <!-- Vehicles Tab -->
+                <div class="tab-pane fade" id="vehiclesContent" role="tabpanel">
+                    <div class="d-flex justify-content-end mb-3">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addVehicle()">
+                            <i class="bi bi-plus-circle"></i> Add Vehicle
+                        </button>
+                    </div>
+                    <div id="vehiclesContainer" class="accordion"></div>
                 </div>
             </div>
 
-            <!-- Teams Section -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h2 class="h5 mb-0">Teams</h2>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="addTeam()">
-                        <i class="bi bi-plus-circle"></i> Add Team
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div id="teams"></div>
-                </div>
+            <div class="mt-4">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-circle"></i> Create Group
+                </button>
             </div>
-
-            <!-- Vehicles Section -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h2 class="h5 mb-0">Vehicles</h2>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="addVehicle()">
-                        <i class="bi bi-plus-circle"></i> Add Vehicle
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div id="vehicles"></div>
-                </div>
-            </div>
-
-            <button type="submit" class="btn btn-success">
-                <i class="bi bi-check-circle"></i> Create Group
-            </button>
         </form>
     </div>
 
@@ -90,11 +104,11 @@
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Role</label>
-                        <input type="text" name="role[]" class="form-control" required>
+                        <input type="text" name="member_role[]" class="form-control" required>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Rank</label>
-                        <input type="text" name="rank[]" class="form-control" required>
+                        <input type="text" name="member_rank[]" class="form-control" required>
                     </div>
                     <div class="col-12">
                         <label class="form-label">Weapons</label>
@@ -113,7 +127,7 @@
 
     <template id="weapon-select-template">
         <div class="input-group mb-2 weapon-select">
-            <select class="form-select" required>
+            <select name="member_weapons[]" class="form-select" required>
                 {{range .Weapons}}
                 <option value="{{.ID}}">{{.Name}} ({{.Type}}, {{.Caliber}})</option>
                 {{end}}
@@ -130,22 +144,264 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        function addDirectMember() {
-            const template = document.getElementById('member-template');
-            const container = document.getElementById('direct_members');
-            const clone = template.content.cloneNode(true);
-            container.appendChild(clone);
+        // Parse the data from the server - using default empty arrays if data isn't provided
+        let weaponOptions = {{if .WeaponOptions}}JSON.parse('{{.WeaponOptions}}'){{else}}[]{{end}};
+        let vehicleOptions = {{if .VehicleOptions}}JSON.parse('{{.VehicleOptions}}'){{else}}[]{{end}};
+
+        // Initialize Bootstrap tabs
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Bootstrap tabs
+            const triggerTabList = document.querySelectorAll('#groupTabs button');
+            triggerTabList.forEach(triggerEl => {
+                const tabTrigger = new bootstrap.Tab(triggerEl);
+                
+                triggerEl.addEventListener('click', event => {
+                    event.preventDefault();
+                    tabTrigger.show();
+                });
+            });
+
+            // Add initial member
+            addMember('directMembers');
+        });
+
+        // Copy all the functions from edit_group.html
+        function addMember(containerId, memberData = null) {
+            let container = document.getElementById(containerId);
+            let memberDiv = document.createElement('div');
+            memberDiv.className = 'card mb-3';
+            
+            let memberIndex = container.children.length;
+            let namePrefix = containerId === 'directMembers' ? '' : `team_${container.dataset.teamIndex}_`;
+            
+            memberDiv.innerHTML = `
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Role</label>
+                            <input type="text" name="${namePrefix}role[]" class="form-control" value="${memberData ? memberData.Role : ''}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Rank</label>
+                            <input type="text" name="${namePrefix}rank[]" class="form-control" value="${memberData ? memberData.Rank : ''}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Weapons</label>
+                            <div class="weapon-selects mb-2"></div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addWeaponSelect(this, '${namePrefix}weapons_${memberIndex}')">
+                                <i class="bi bi-plus-circle"></i> Add Weapon
+                            </button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm mt-3" onclick="this.closest('.card').remove()">
+                        <i class="bi bi-trash"></i> Remove Member
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(memberDiv);
+            
+            // Add initial weapon select
+            let weaponButton = memberDiv.querySelector('button');
+            addWeaponSelect(weaponButton, `${namePrefix}weapons_${memberIndex}`);
         }
 
-        function addWeaponSelect(buttonElement) {
-            const template = document.getElementById('weapon-select-template');
-            const container = buttonElement.previousElementSibling;
-            const clone = template.content.cloneNode(true);
-            container.appendChild(clone);
+        function addTeam(teamData = null) {
+            let container = document.getElementById('teamsContainer');
+            let teamIndex = container.children.length;
+            let teamDiv = document.createElement('div');
+            teamDiv.className = 'accordion-item mb-3 border border-2 border-secondary-subtle rounded-3';
+            
+            teamDiv.innerHTML = `
+                <h2 class="accordion-header d-flex align-items-center bg-light border-bottom rounded-top">
+                    <div class="accordion-button py-2" style="cursor: default; border: none; box-shadow: none;">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1">
+                            <input type="text" name="team_name[]" class="form-control form-control-sm" 
+                                   value="${teamData ? teamData.Name : ''}" 
+                                   placeholder="Team Name"
+                                   style="width: 200px;"
+                                   required>
+                            <span class="badge bg-secondary">Members: <span class="member-count">0</span></span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" 
+                            onclick="toggleCollapse(this, 'team${teamIndex}')">
+                        Collapse
+                    </button>
+                </h2>
+                <div id="team${teamIndex}" class="accordion-collapse collapse show">
+                    <div class="accordion-body">
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-primary btn-sm" 
+                                    onclick="addMember('team_${teamIndex}_members')">
+                                <i class="bi bi-plus-circle"></i> Add Team Member
+                            </button>
+                        </div>
+                        <div id="team_${teamIndex}_members" data-team-index="${teamIndex}" class="ps-4 border-start border-2"></div>
+                        <button type="button" class="btn btn-outline-danger btn-sm mt-3" 
+                                onclick="this.closest('.accordion-item').remove()">
+                            <i class="bi bi-trash"></i> Remove Team
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(teamDiv);
+
+            // Update member count when members are added or removed
+            const updateMemberCount = () => {
+                const memberCount = document.getElementById(`team_${teamIndex}_members`).children.length;
+                teamDiv.querySelector('.member-count').textContent = memberCount;
+            };
+
+            const observer = new MutationObserver(updateMemberCount);
+            observer.observe(document.getElementById(`team_${teamIndex}_members`), { childList: true });
+            updateMemberCount();
         }
 
-        // Add initial member
-        addDirectMember();
+        function addVehicle(vehicleData = null) {
+            let container = document.getElementById('vehiclesContainer');
+            let vehicleIndex = container.children.length;
+            let vehicleDiv = document.createElement('div');
+            vehicleDiv.className = 'accordion-item mb-3 border border-2 border-secondary-subtle rounded-3';
+            
+            vehicleDiv.innerHTML = `
+                <h2 class="accordion-header d-flex align-items-center bg-light border-bottom rounded-top">
+                    <div class="accordion-button py-2" style="cursor: default; border: none; box-shadow: none;">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1">
+                            <select name="vehicle_id[]" class="form-select form-select-sm" 
+                                    style="width: 200px;"
+                                    required>
+                                ${vehicleOptions.map(v => 
+                                    `<option value="${v.ID}" ${vehicleData && v.ID == vehicleData.ID ? 'selected' : ''}>
+                                        ${v.Name} (${v.Type})
+                                    </option>`
+                                ).join('')}
+                            </select>
+                            <span class="badge bg-secondary">Crew: <span class="crew-count">0</span></span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" 
+                            onclick="toggleCollapse(this, 'vehicle${vehicleIndex}')">
+                        Collapse
+                    </button>
+                </h2>
+                <div id="vehicle${vehicleIndex}" class="accordion-collapse collapse show">
+                    <div class="accordion-body">
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-primary btn-sm" 
+                                    onclick="addVehicleMember(${vehicleIndex})">
+                                <i class="bi bi-plus-circle"></i> Add Crew Member
+                            </button>
+                        </div>
+                        <div id="vehicle_${vehicleIndex}_members" class="ps-4 border-start border-2"></div>
+                        <button type="button" class="btn btn-outline-danger btn-sm mt-3" 
+                                onclick="this.closest('.accordion-item').remove()">
+                            <i class="bi bi-trash"></i> Remove Vehicle
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(vehicleDiv);
+
+            // Update crew count when members are added or removed
+            const updateCrewCount = () => {
+                const crewCount = document.getElementById(`vehicle_${vehicleIndex}_members`).children.length;
+                vehicleDiv.querySelector('.crew-count').textContent = crewCount;
+            };
+
+            const observer = new MutationObserver(updateCrewCount);
+            observer.observe(document.getElementById(`vehicle_${vehicleIndex}_members`), { childList: true });
+            updateCrewCount();
+        }
+
+        function addVehicleMember(vehicleIndex, memberData = null) {
+            let container = document.getElementById(`vehicle_${vehicleIndex}_members`);
+            let memberIndex = container.children.length;
+            
+            let memberDiv = document.createElement('div');
+            memberDiv.className = 'card mb-3';
+            
+            memberDiv.innerHTML = `
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Role</label>
+                            <input type="text" name="vehicle_${vehicleIndex}_role[]" class="form-control" value="${memberData ? memberData.Role : ''}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Rank</label>
+                            <input type="text" name="vehicle_${vehicleIndex}_rank[]" class="form-control" value="${memberData ? memberData.Rank : ''}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Weapons</label>
+                            <div class="weapon-selects mb-2"></div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addWeaponSelect(this, 'vehicle_${vehicleIndex}_weapons_${memberIndex}')">
+                                <i class="bi bi-plus-circle"></i> Add Weapon
+                            </button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm mt-3" onclick="this.closest('.card').remove()">
+                        <i class="bi bi-trash"></i> Remove Member
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(memberDiv);
+            
+            // Add initial weapon select
+            let weaponButton = memberDiv.querySelector('button');
+            addWeaponSelect(weaponButton, `vehicle_${vehicleIndex}_weapons_${memberIndex}`);
+        }
+
+        function addWeaponSelect(buttonElement, namePrefix, selectedWeaponID = null) {
+            let container = buttonElement.parentElement.querySelector('.weapon-selects');
+            let weaponDiv = document.createElement('div');
+            weaponDiv.className = 'input-group mb-2';
+            
+            let select = document.createElement('select');
+            select.className = 'form-select';
+            select.name = namePrefix ? `${namePrefix}[]` : 'weapons[]';
+            select.required = true;
+            
+            weaponOptions.forEach(weapon => {
+                let option = document.createElement('option');
+                option.value = weapon.ID;
+                option.textContent = `${weapon.Name} (${weapon.Type}, ${weapon.Caliber})`;
+                if (selectedWeaponID && weapon.ID == selectedWeaponID) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+            
+            let removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'btn btn-outline-danger';
+            removeButton.innerHTML = '<i class="bi bi-trash"></i>';
+            removeButton.onclick = function() {
+                weaponDiv.remove();
+            };
+            
+            weaponDiv.appendChild(select);
+            weaponDiv.appendChild(removeButton);
+            container.appendChild(weaponDiv);
+        }
+
+        function toggleCollapse(button, targetId) {
+            const targetElement = document.getElementById(targetId);
+            if (!targetElement) return;
+            
+            const isCollapsed = !targetElement.classList.contains('show');
+            
+            if (isCollapsed) {
+                targetElement.classList.add('show');
+                button.textContent = 'Collapse';
+            } else {
+                targetElement.classList.remove('show');
+                button.textContent = 'Expand';
+            }
+        }
     </script>
 </body>
 </html>

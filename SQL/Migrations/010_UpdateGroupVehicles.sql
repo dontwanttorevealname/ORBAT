@@ -22,20 +22,5 @@ CREATE TABLE vehicle_members (
 );
 
 -- +goose Down
+DROP TABLE IF EXISTS vehicle_members;
 DROP TABLE IF EXISTS group_vehicles;
-
-CREATE TABLE group_vehicles (
-    group_id INTEGER,
-    vehicle_id INTEGER,
-    PRIMARY KEY (group_id, vehicle_id),
-    FOREIGN KEY (group_id) REFERENCES groups(group_id),
-    FOREIGN KEY (vehicle_id) REFERENCES vehicles(vehicle_id)
-);
-
-CREATE TABLE vehicle_members (
-    vehicle_id INTEGER,
-    member_id INTEGER,
-    PRIMARY KEY (vehicle_id, member_id),
-    FOREIGN KEY (vehicle_id) REFERENCES vehicles(vehicle_id),
-    FOREIGN KEY (member_id) REFERENCES members(member_id)
-);

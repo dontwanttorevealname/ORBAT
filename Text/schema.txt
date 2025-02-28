@@ -13,6 +13,7 @@
                 weapon_name - string
                 weapon_type - string
                 caliber - string
+                image_url - string
         > Team - Object
             team_id - Int
             team_name - String
@@ -27,3 +28,17 @@
                         weapon_name - string
                         weapon_type - string
                         caliber - string
+                        image_url - string
+    > group_vehicles - Object
+        instance_id - Int
+        > Vehicle - Object
+            vehicle_id - Int
+            vehicle_name - String
+            vehicle_type - String
+            vehicle_armament - String
+            image_url - String
+        > vehicle_members - Object
+            > Member - Object
+                member_id - int
+                member_role - string
+                member_rank - string

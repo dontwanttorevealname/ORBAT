@@ -13,6 +13,7 @@ import (
 // Client is the global storage client
 var Client *storage.Client
 var BucketName string
+var environment string
 
 // Initialize sets up the storage client
 func Initialize() error {
@@ -27,6 +28,12 @@ func Initialize() error {
 	BucketName = os.Getenv("GCS_BUCKET_NAME")
 	if BucketName == "" {
 		return fmt.Errorf("GCS_BUCKET_NAME environment variable not set")
+	}
+
+	// Store the environment setting
+	environment = os.Getenv("ENV")
+	if environment == "" {
+		environment = "development"
 	}
 	
 	return nil
@@ -66,6 +73,12 @@ func UploadImage(file io.Reader, filename string) (string, error) {
 
 // DeleteImage deletes an image from Google Cloud Storage
 func DeleteImage(imageURL string) error {
+	// Don't actually delete files when in test environment
+	if environment == "test" {
+		fmt.Printf("Test environment: Skipping deletion of image %s\n", imageURL)
+		return nil
+	}
+
 	// Extract bucket name and object path from the URL
 	// URL format: https://storage.googleapis.com/BUCKET_NAME/PATH/TO/OBJECT
 	urlParts := strings.Split(imageURL, "/")

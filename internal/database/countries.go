@@ -95,7 +95,7 @@ func GetCountryDetails(countryName string) (models.CountryDetails, error) {
 		) membership ON m.member_id = membership.member_id
 		WHERE membership.group_nationality = ?
 		GROUP BY w.weapon_id
-		ORDER BY w.weapon_name`, countryName)
+		ORDER BY w.weapon_name`, decodedName)
 	if err != nil {
 		return details, err
 	}
@@ -123,7 +123,7 @@ func GetCountryDetails(countryName string) (models.CountryDetails, error) {
 		JOIN groups g ON gv.group_id = g.group_id
 		WHERE g.group_nationality = ?
 		GROUP BY v.vehicle_id
-		ORDER BY v.vehicle_name`, countryName)
+		ORDER BY v.vehicle_name`, decodedName)
 	if err != nil {
 		return details, err
 	}

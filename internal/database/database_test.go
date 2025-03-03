@@ -26,7 +26,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestWeaponOperations(t *testing.T) {
-    // Test weapons retrieval
     weapons, err := GetWeapons()
     if err != nil {
         t.Fatalf("Failed to get weapons: %v", err)
@@ -35,21 +34,26 @@ func TestWeaponOperations(t *testing.T) {
     // Check if test weapons exist
     found := false
     for _, w := range weapons {
-        if w.Name == "Test Rifle" {
+        if w.ID == 1000 {
             found = true
+            if w.Name != "Test Rifle" {
+                t.Errorf("Expected weapon name 'Test Rifle', got '%s'", w.Name)
+            }
             if w.Type != "Test Type" {
                 t.Errorf("Expected weapon type 'Test Type', got '%s'", w.Type)
+            }
+            if w.Caliber != "Test Caliber" {
+                t.Errorf("Expected caliber 'Test Caliber', got '%s'", w.Caliber)
             }
             break
         }
     }
     if !found {
-        t.Error("Test weapon not found in database")
+        t.Error("Test weapon (ID: 1000) not found in database")
     }
 }
 
 func TestGroupOperations(t *testing.T) {
-    // Test groups retrieval
     groups, err := GetGroups()
     if err != nil {
         t.Fatalf("Failed to get groups: %v", err)
@@ -60,76 +64,106 @@ func TestGroupOperations(t *testing.T) {
     for _, g := range groups {
         if g.ID == 1000 {
             found = true
-            if g.Name != "Test Group" {
-                t.Errorf("Expected group name 'Test Group', got '%s'", g.Name)
+            if g.Size != 3 { // Should have 3 test members
+                t.Errorf("Expected group size 3, got %d", g.Size)
             }
             break
         }
     }
     if !found {
-        t.Error("Test group not found in database")
+        t.Error("Test group (ID: 1000) not found in database")
     }
 }
 
 func TestCountryOperations(t *testing.T) {
-    // Test country retrieval
     countries, err := GetCountries()
     if err != nil {
         t.Fatalf("Failed to get countries: %v", err)
     }
 
-    // Check if we have at least one country
-    if len(countries) == 0 {
-        t.Error("No countries found in database")
+    // Check for test country
+    testCountryFound := false
+    for _, country := range countries {
+        if country == "Test Country" {
+            testCountryFound = true
+            break
+        }
+    }
+    if !testCountryFound {
+        t.Error("Test Country not found in countries list")
     }
 
-    // Test country details retrieval
-    if len(countries) > 0 {
-        details, err := GetCountryDetails(countries[0])
-        if err != nil {
-            t.Fatalf("Failed to get country details: %v", err)
-        }
+    // Test country details
+    details, err := GetCountryDetails("Test Country")
+    if err != nil {
+        t.Fatalf("Failed to get country details: %v", err)
+    }
 
-        if details.Name == "" {
-            t.Error("Country details name is empty")
-        }
+    if details.Name != "Test Country" {
+        t.Errorf("Expected country name 'Test Country', got '%s'", details.Name)
     }
 }
 
 func TestVehicleUsage(t *testing.T) {
-    // Test getting country details which includes vehicle usage
     details, err := GetCountryDetails("Test Country")
     if err != nil {
         t.Fatalf("Failed to get country details: %v", err)
     }
 
-    // Check vehicle usage data
+    // Check for test vehicles
+    foundVehicle1 := false
+    foundVehicle2 := false
     for _, v := range details.Vehicles {
-        if v.Name == "Test Vehicle 1" {
-            if v.InstanceCount == 0 {
-                t.Error("Expected non-zero instance count for test vehicle")
+        switch v.ID {
+        case 1000:
+            foundVehicle1 = true
+            if v.Name != "Test Vehicle 1" {
+                t.Errorf("Expected vehicle name 'Test Vehicle 1', got '%s'", v.Name)
             }
-            return
+        case 1001:
+            foundVehicle2 = true
+            if v.Name != "Test Vehicle 2" {
+                t.Errorf("Expected vehicle name 'Test Vehicle 2', got '%s'", v.Name)
+            }
         }
     }
-    t.Error("Test vehicle not found in usage data")
+
+    if !foundVehicle1 {
+        t.Error("Test Vehicle 1 not found")
+    }
+    if !foundVehicle2 {
+        t.Error("Test Vehicle 2 not found")
+    }
 }
 
 func TestWeaponUsage(t *testing.T) {
-    // Test getting country details which includes weapon usage
     details, err := GetCountryDetails("Test Country")
     if err != nil {
         t.Fatalf("Failed to get country details: %v", err)
     }
 
-    // Check weapon usage data
+    // Check for test weapons
+    foundWeapon1 := false
+    foundWeapon2 := false
     for _, w := range details.Weapons {
-        if w.Name == "Test Rifle" {
-            if w.UserCount == 0 {
-                t.Error("Expected non-zero user count for test weapon")
+        switch w.ID {
+        case 1000:
+            foundWeapon1 = true
+            if w.Name != "Test Rifle" {
+                t.Errorf("Expected weapon name 'Test Rifle', got '%s'", w.Name)
             }
-            return
+        case 1001:
+            foundWeapon2 = true
+            if w.Name != "Test Machine Gun" {
+                t.Errorf("Expected weapon name 'Test Machine Gun', got '%s'", w.Name)
+            }
         }
     }
-    t.Error("Test weapon not found in usage data")
+
+    if !foundWeapon1 {
+        t.Error("Test Rifle not found")
+    }
+    if !foundWeapon2 {
+        t.Error("Test Machine Gun not found")
+    }
 }

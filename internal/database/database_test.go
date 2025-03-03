@@ -174,3 +174,166 @@ func TestWeaponUsage(t *testing.T) {
         t.Error("Test Machine Gun not found")
     }
 }
+
+func TestCreateAndDeleteWeapon(t *testing.T) {
+    // Create a new test weapon
+    newWeapon := Weapon{
+        ID:      2000,
+        Name:    "Test Create Weapon",
+        Type:    "Test Create Type",
+        Caliber: "Test Create Caliber",
+    }
+
+    err := CreateWeapon(newWeapon)
+    if err != nil {
+        t.Fatalf("Failed to create weapon: %v", err)
+    }
+
+    // Verify the weapon was created
+    weapons, err := GetWeapons()
+    if err != nil {
+        t.Fatalf("Failed to get weapons: %v", err)
+    }
+
+    found := false
+    for _, w := range weapons {
+        if w.ID == newWeapon.ID {
+            found = true
+            if w.Name != newWeapon.Name {
+                t.Errorf("Expected weapon name '%s', got '%s'", newWeapon.Name, w.Name)
+            }
+            break
+        }
+    }
+    if !found {
+        t.Error("Created weapon not found in database")
+    }
+
+    // Delete the weapon
+    err = DeleteWeapon(newWeapon.ID)
+    if err != nil {
+        t.Fatalf("Failed to delete weapon: %v", err)
+    }
+
+    // Verify the weapon was deleted
+    weapons, err = GetWeapons()
+    if err != nil {
+        t.Fatalf("Failed to get weapons after deletion: %v", err)
+    }
+
+    for _, w := range weapons {
+        if w.ID == newWeapon.ID {
+            t.Error("Weapon still exists after deletion")
+        }
+    }
+}
+
+func TestCreateAndDeleteGroup(t *testing.T) {
+    // Create a new test group
+    newGroup := Group{
+        ID:          2000,
+        Name:        "Test Create Group",
+        Size:        2,
+        Nationality: "Test Create Nation",
+    }
+
+    err := CreateGroup(newGroup)
+    if err != nil {
+        t.Fatalf("Failed to create group: %v", err)
+    }
+
+    // Verify the group was created
+    groups, err := GetGroups()
+    if err != nil {
+        t.Fatalf("Failed to get groups: %v", err)
+    }
+
+    found := false
+    for _, g := range groups {
+        if g.ID == newGroup.ID {
+            found = true
+            if g.Name != newGroup.Name {
+                t.Errorf("Expected group name '%s', got '%s'", newGroup.Name, g.Name)
+            }
+            break
+        }
+    }
+    if !found {
+        t.Error("Created group not found in database")
+    }
+
+    // Delete the group
+    err = DeleteGroup(newGroup.ID)
+    if err != nil {
+        t.Fatalf("Failed to delete group: %v", err)
+    }
+
+    // Verify the group was deleted
+    groups, err = GetGroups()
+    if err != nil {
+        t.Fatalf("Failed to get groups after deletion: %v", err)
+    }
+
+    for _, g := range groups {
+        if g.ID == newGroup.ID {
+            t.Error("Group still exists after deletion")
+        }
+    }
+}
+
+func TestUpdateWeapon(t *testing.T) {
+    // Create a weapon to update
+    initialWeapon := Weapon{
+        ID:      3000,
+        Name:    "Initial Weapon",
+        Type:    "Initial Type",
+        Caliber: "Initial Caliber",
+    }
+
+    err := CreateWeapon(initialWeapon)
+    if err != nil {
+        t.Fatalf("Failed to create initial weapon: %v", err)
+    }
+
+    // Update the weapon
+    updatedWeapon := Weapon{
+        ID:      3000,
+        Name:    "Updated Weapon",
+        Type:    "Updated Type",
+        Caliber: "Updated Caliber",
+    }
+
+    err = UpdateWeapon(updatedWeapon)
+    if err != nil {
+        t.Fatalf("Failed to update weapon: %v", err)
+    }
+
+    // Verify the update
+    weapons, err := GetWeapons()
+    if err != nil {
+        t.Fatalf("Failed to get weapons: %v", err)
+    }
+
+    found := false
+    for _, w := range weapons {
+        if w.ID == updatedWeapon.ID {
+            found = true
+            if w.Name != updatedWeapon.Name {
+                t.Errorf("Expected updated weapon name '%s', got '%s'", updatedWeapon.Name, w.Name)
+            }
+            if w.Type != updatedWeapon.Type {
+                t.Errorf("Expected updated weapon type '%s', got '%s'", updatedWeapon.Type, w.Type)
+            }
+            break
+        }
+    }
+    if !found {
+        t.Error("Updated weapon not found in database")
+    }
+
+    // Cleanup
+    err = DeleteWeapon(updatedWeapon.ID)
+    if err != nil {
+        t.Fatalf("Failed to cleanup test weapon: %v", err)
+    }
+}

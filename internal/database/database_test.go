@@ -327,3 +327,188 @@ func TestUpdateWeapon(t *testing.T) {
         t.Fatalf("Failed to cleanup test weapon: %v", err)
     }
 }
+
+func TestCreateGroupWithTeam(t *testing.T) {
+    // Create a test group with a team
+    groupName := "Test Group With Team"
+    teamName := "Test Team"
+    nationality := "Test Nation"
+    
+    tx, err := DB.Begin()
+    if err != nil {
+        t.Fatalf("Failed to begin transaction: %v", err)
+    }
+    defer tx.Rollback()
+
+    // Insert the group
+    result, err := tx.Exec(`
+        INSERT INTO groups (group_name, group_nationality, group_size)
+        VALUES (?, ?, 0)`,
+        groupName, nationality)
+    if err != nil {
+        t.Fatalf("Failed to create group: %v", err)
+    }
+
+    groupID, err := result.LastInsertId()
+    if err != nil {
+        t.Fatalf("Failed to get group ID: %v", err)
+    }
+
+    // Insert a team
+    result, err = tx.Exec(`
+        INSERT INTO teams (team_name, team_size)
+        VALUES (?, 2)`,
+        teamName)
+    if err != nil {
+        t.Fatalf("Failed to create team: %v", err)
+    }
+
+    teamID, err := result.LastInsertId()
+    if err != nil {
+        t.Fatalf("Failed to get team ID: %v", err)
+    }
+
+    // Associate team with group
+    _, err = tx.Exec(`
+        INSERT INTO group_members (group_id, team_id)
+        VALUES (?, ?)`,
+        groupID, teamID)
+    if err != nil {
+        t.Fatalf("Failed to associate team with group: %v", err)
+    }
+
+    if err := tx.Commit(); err != nil {
+        t.Fatalf("Failed to commit transaction: %v", err)
+    }
+
+    // Verify the group and team were created correctly
+    details, err := GetGroupDetails(fmt.Sprintf("%d", groupID))
+    if err != nil {
+        t.Fatalf("Failed to get group details: %v", err)
+    }
+
+    if details.Name != groupName {
+        t.Errorf("Expected group name '%s', got '%s'", groupName, details.Name)
+    }
+
+    if len(details.Teams) != 1 {
+        t.Errorf("Expected 1 team, got %d teams", len(details.Teams))
+    } else if details.Teams[0].Name != teamName {
+        t.Errorf("Expected team name '%s', got '%s'", teamName, details.Teams[0].Name)
+    }
+
+    // Cleanup
+    err = DeleteGroup(DB, fmt.Sprintf("%d", groupID))
+    if err != nil {
+        t.Fatalf("Failed to cleanup test group: %v", err)
+    }
+}
+
+func TestCreateGroupWithVehicle(t *testing.T) {
+    // Create a test group with a vehicle and crew
+    groupName := "Test Vehicle Group"
+    nationality := "Test Nation"
+    vehicleName := "Test Vehicle"
+    
+    tx, err := DB.Begin()
+    if err != nil {
+        t.Fatalf("Failed to begin transaction: %v", err)
+    }
+    defer tx.Rollback()
+
+    // Insert the group
+    result, err := tx.Exec(`
+        INSERT INTO groups (group_name, group_nationality, group_size)
+        VALUES (?, ?, 0)`,
+        groupName, nationality)
+    if err != nil {
+        t.Fatalf("Failed to create group: %v", err)
+    }
+
+    groupID, err := result.LastInsertId()
+    if err != nil {
+        t.Fatalf("Failed to get group ID: %v", err)
+    }
+
+    // Insert a vehicle
+    result, err = tx.Exec(`
+        INSERT INTO vehicles (vehicle_id, vehicle_name, vehicle_type, vehicle_armament)
+        VALUES (?, ?, 'Test Type', 'Test Gun')`,
+        2000, vehicleName)
+    if err != nil {
+        t.Fatalf("Failed to create vehicle: %v", err)
+    }
+
+    // Create vehicle instance for the group
+    result, err = tx.Exec(`
+        INSERT INTO group_vehicles (group_id, vehicle_id)
+        VALUES (?, ?)`,
+        groupID, 2000)
+    if err != nil {
+        t.Fatalf("Failed to create vehicle instance: %v", err)
+    }
+
+    instanceID, err := result.LastInsertId()
+    if err != nil {
+        t.Fatalf("Failed to get instance ID: %v", err)
+    }
+
+    // Add crew members
+    crewRoles := []string{"Commander", "Driver"}
+    for _, role := range crewRoles {
+        // Create crew member
+        result, err = tx.Exec(`
+            INSERT INTO members (member_role, member_rank)
+            VALUES (?, 'Test Rank')`,
+            role)
+        if err != nil {
+            t.Fatalf("Failed to create crew member: %v", err)
+        }
+
+        memberID, err := result.LastInsertId()
+        if err != nil {
+            t.Fatalf("Failed to get member ID: %v", err)
+        }
+
+        // Associate with vehicle
+        _, err = tx.Exec(`
+            INSERT INTO vehicle_members (instance_id, member_id)
+            VALUES (?, ?)`,
+            instanceID, memberID)
+        if err != nil {
+            t.Fatalf("Failed to associate crew member with vehicle: %v", err)
+        }
+    }
+
+    if err := tx.Commit(); err != nil {
+        t.Fatalf("Failed to commit transaction: %v", err)
+    }
+
+    // Verify the group and vehicle were created correctly
+    details, err := GetGroupDetails(fmt.Sprintf("%d", groupID))
+    if err != nil {
+        t.Fatalf("Failed to get group details: %v", err)
+    }
+
+    if details.Name != groupName {
+        t.Errorf("Expected group name '%s', got '%s'", groupName, details.Name)
+    }
+
+    if len(details.Vehicles) != 1 {
+        t.Errorf("Expected 1 vehicle, got %d vehicles", len(details.Vehicles))
+    } else {
+        vehicle := details.Vehicles[0]
+        if vehicle.Name != vehicleName {
+            t.Errorf("Expected vehicle name '%s', got '%s'", vehicleName, vehicle.Name)
+        }
+        if len(vehicle.Crew) != 2 {
+            t.Errorf("Expected 2 crew members, got %d", len(vehicle.Crew))
+        }
+    }
+
+    // Cleanup
+    err = DeleteGroup(DB, fmt.Sprintf("%d", groupID))
+    if err != nil {
+        t.Fatalf("Failed to cleanup test group: %v", err)
+    }
+}

@@ -5,7 +5,9 @@ on:
     workflows: ["Run Tests"]
     types:
       - completed
-    branches: [main]
+    branches: 
+      - main
+  workflow_dispatch:  # Add this to allow manual triggers
 
 jobs:
   deploy:

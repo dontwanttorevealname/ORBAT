@@ -50,3 +50,9 @@ jobs:
             **/*_test.go
             **/testdata
           retention-days: 7
+
+      - name: Signal workflow completion
+        if: success()
+        run: |
+          echo "Tests completed successfully"
+          exit 0

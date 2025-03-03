@@ -145,12 +145,12 @@ func TestWeaponUsage(t *testing.T) {
     foundWeapon1 := false
     foundWeapon2 := false
     for _, w := range details.Weapons {
-        if w.Weapon.ID == "1000" {
+        if w.Weapon.ID == 1000 {
             foundWeapon1 = true
             if w.Name != "Test Rifle" {
                 t.Errorf("Expected weapon name 'Test Rifle', got '%s'", w.Name)
             }
-        } else if w.Weapon.ID == "1001" {
+        } else if w.Weapon.ID == 1001 {
             foundWeapon2 = true
             if w.Name != "Test Machine Gun" {
                 t.Errorf("Expected weapon name 'Test Machine Gun', got '%s'", w.Name)

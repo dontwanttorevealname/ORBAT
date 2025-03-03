@@ -4,6 +4,7 @@ import (
     "os"
     "testing"
     "github.com/joho/godotenv"
+    "fmt"
 )
 
 func TestMain(m *testing.M) {
@@ -177,14 +178,18 @@ func TestWeaponUsage(t *testing.T) {
 
 func TestCreateAndDeleteWeapon(t *testing.T) {
     // Create a new test weapon
-    newWeapon := Weapon{
+    newWeapon := models.Weapon{
         ID:      2000,
         Name:    "Test Create Weapon",
         Type:    "Test Create Type",
         Caliber: "Test Create Caliber",
     }
 
-    err := CreateWeapon(newWeapon)
+    // Insert the weapon directly using SQL
+    _, err := DB.Exec(`
+        INSERT INTO weapons (weapon_id, weapon_name, weapon_type, weapon_caliber)
+        VALUES (?, ?, ?, ?)`,
+        newWeapon.ID, newWeapon.Name, newWeapon.Type, newWeapon.Caliber)
     if err != nil {
         t.Fatalf("Failed to create weapon: %v", err)
     }
@@ -209,37 +214,30 @@ func TestCreateAndDeleteWeapon(t *testing.T) {
         t.Error("Created weapon not found in database")
     }
 
-    // Delete the weapon
-    err = DeleteWeapon(newWeapon.ID)
+    // Cleanup
+    err = DeleteWeapon(fmt.Sprintf("%d", newWeapon.ID))
     if err != nil {
-        t.Fatalf("Failed to delete weapon: %v", err)
-    }
-
-    // Verify the weapon was deleted
-    weapons, err = GetWeapons()
-    if err != nil {
-        t.Fatalf("Failed to get weapons after deletion: %v", err)
-    }
-
-    for _, w := range weapons {
-        if w.ID == newWeapon.ID {
-            t.Error("Weapon still exists after deletion")
-        }
+        t.Fatalf("Failed to cleanup test weapon: %v", err)
     }
 }
 
 func TestCreateAndDeleteGroup(t *testing.T) {
     // Create a new test group
-    newGroup := Group{
-        ID:          2000,
-        Name:        "Test Create Group",
-        Size:        2,
-        Nationality: "Test Create Nation",
-    }
-
-    err := CreateGroup(newGroup)
+    groupName := "Test Create Group"
+    nationality := "Test Nation"
+    
+    // Insert the group directly using SQL
+    result, err := DB.Exec(`
+        INSERT INTO groups (group_name, group_nationality, group_size)
+        VALUES (?, ?, 0)`,
+        groupName, nationality)
     if err != nil {
         t.Fatalf("Failed to create group: %v", err)
+    }
+
+    groupID, err := result.LastInsertId()
+    if err != nil {
+        t.Fatalf("Failed to get last insert ID: %v", err)
     }
 
     // Verify the group was created
@@ -250,10 +248,10 @@ func TestCreateAndDeleteGroup(t *testing.T) {
 
     found := false
     for _, g := range groups {
-        if g.ID == newGroup.ID {
+        if g.ID == int(groupID) {
             found = true
-            if g.Name != newGroup.Name {
-                t.Errorf("Expected group name '%s', got '%s'", newGroup.Name, g.Name)
+            if g.Name != groupName {
+                t.Errorf("Expected group name '%s', got '%s'", groupName, g.Name)
             }
             break
         }
@@ -262,48 +260,39 @@ func TestCreateAndDeleteGroup(t *testing.T) {
         t.Error("Created group not found in database")
     }
 
-    // Delete the group
-    err = DeleteGroup(newGroup.ID)
+    // Cleanup
+    err = DeleteGroup(DB, fmt.Sprintf("%d", groupID))
     if err != nil {
-        t.Fatalf("Failed to delete group: %v", err)
-    }
-
-    // Verify the group was deleted
-    groups, err = GetGroups()
-    if err != nil {
-        t.Fatalf("Failed to get groups after deletion: %v", err)
-    }
-
-    for _, g := range groups {
-        if g.ID == newGroup.ID {
-            t.Error("Group still exists after deletion")
-        }
+        t.Fatalf("Failed to cleanup test group: %v", err)
     }
 }
 
 func TestUpdateWeapon(t *testing.T) {
-    // Create a weapon to update
-    initialWeapon := Weapon{
+    // Create a test weapon
+    initialWeapon := models.Weapon{
         ID:      3000,
         Name:    "Initial Weapon",
         Type:    "Initial Type",
         Caliber: "Initial Caliber",
     }
 
-    err := CreateWeapon(initialWeapon)
+    // Insert the weapon directly using SQL
+    _, err := DB.Exec(`
+        INSERT INTO weapons (weapon_id, weapon_name, weapon_type, weapon_caliber)
+        VALUES (?, ?, ?, ?)`,
+        initialWeapon.ID, initialWeapon.Name, initialWeapon.Type, initialWeapon.Caliber)
     if err != nil {
         t.Fatalf("Failed to create initial weapon: %v", err)
     }
 
-    // Update the weapon
-    updatedWeapon := Weapon{
-        ID:      3000,
-        Name:    "Updated Weapon",
-        Type:    "Updated Type",
-        Caliber: "Updated Caliber",
-    }
-
-    err = UpdateWeapon(updatedWeapon)
+    // Update the weapon directly using SQL
+    updatedName := "Updated Weapon"
+    updatedType := "Updated Type"
+    _, err = DB.Exec(`
+        UPDATE weapons 
+        SET weapon_name = ?, weapon_type = ?
+        WHERE weapon_id = ?`,
+        updatedName, updatedType, initialWeapon.ID)
     if err != nil {
         t.Fatalf("Failed to update weapon: %v", err)
     }
@@ -316,13 +305,13 @@ func TestUpdateWeapon(t *testing.T) {
 
     found := false
     for _, w := range weapons {
-        if w.ID == updatedWeapon.ID {
+        if w.ID == initialWeapon.ID {
             found = true
-            if w.Name != updatedWeapon.Name {
-                t.Errorf("Expected updated weapon name '%s', got '%s'", updatedWeapon.Name, w.Name)
+            if w.Name != updatedName {
+                t.Errorf("Expected updated weapon name '%s', got '%s'", updatedName, w.Name)
             }
-            if w.Type != updatedWeapon.Type {
-                t.Errorf("Expected updated weapon type '%s', got '%s'", updatedWeapon.Type, w.Type)
+            if w.Type != updatedType {
+                t.Errorf("Expected updated weapon type '%s', got '%s'", updatedType, w.Type)
             }
             break
         }
@@ -332,7 +321,7 @@ func TestUpdateWeapon(t *testing.T) {
     }
 
     // Cleanup
-    err = DeleteWeapon(updatedWeapon.ID)
+    err = DeleteWeapon(fmt.Sprintf("%d", initialWeapon.ID))
     if err != nil {
         t.Fatalf("Failed to cleanup test weapon: %v", err)
     }

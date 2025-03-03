@@ -7,6 +7,9 @@ on:
 jobs:
   test:
     uses: ./.github/workflows/test.yml
+    secrets:
+      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
 
   deploy:
     needs: test

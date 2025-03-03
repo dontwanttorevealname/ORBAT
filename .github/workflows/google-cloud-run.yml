@@ -39,7 +39,6 @@ jobs:
       - name: Setup test database and run migrations
         run: |
           ./run-test-migrations.sh
-          goose -dir migrations sqlite3 ${{ secrets.TEST_DATABASE_URL }} up
 
       - name: Run tests
         run: go test ./... -v

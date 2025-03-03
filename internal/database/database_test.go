@@ -5,6 +5,7 @@ import (
     "testing"
     "github.com/joho/godotenv"
     "fmt"
+    "orbat/internal/models"
 )
 
 func TestMain(m *testing.M) {

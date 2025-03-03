@@ -43,6 +43,7 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
+SQL/Seeds/*
 
 # Misc
 *.bak

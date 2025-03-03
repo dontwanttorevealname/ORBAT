@@ -81,34 +81,40 @@ func TestCountryOperations(t *testing.T) {
         t.Fatalf("Failed to get countries: %v", err)
     }
 
+    // Debug: Print all countries
+    t.Logf("Found countries: %v", countries)
+
     // Check for test country
     testCountryFound := false
     for _, country := range countries {
-        if country == "Test Country" {
+        if country == "Test Nation" { // Changed: Match the actual value from seed file
             testCountryFound = true
             break
         }
     }
     if !testCountryFound {
-        t.Error("Test Country not found in countries list")
+        t.Error("Test Nation not found in countries list")
     }
 
     // Test country details
-    details, err := GetCountryDetails("Test Country")
+    details, err := GetCountryDetails("Test Nation") // Changed: Match the actual value
     if err != nil {
         t.Fatalf("Failed to get country details: %v", err)
     }
 
-    if details.Name != "Test Country" {
-        t.Errorf("Expected country name 'Test Country', got '%s'", details.Name)
+    if details.Name != "Test Nation" { // Changed: Match the actual value
+        t.Errorf("Expected country name 'Test Nation', got '%s'", details.Name)
     }
 }
 
 func TestVehicleUsage(t *testing.T) {
-    details, err := GetCountryDetails("Test Country")
+    details, err := GetCountryDetails("Test Nation") // Changed: Match the actual value
     if err != nil {
         t.Fatalf("Failed to get country details: %v", err)
     }
+
+    // Debug: Print all vehicles
+    t.Logf("Found vehicles: %+v", details.Vehicles)
 
     // Check for test vehicles
     foundVehicle1 := false
@@ -136,10 +142,13 @@ func TestVehicleUsage(t *testing.T) {
 }
 
 func TestWeaponUsage(t *testing.T) {
-    details, err := GetCountryDetails("Test Country")
+    details, err := GetCountryDetails("Test Nation") // Changed: Match the actual value
     if err != nil {
         t.Fatalf("Failed to get country details: %v", err)
     }
+
+    // Debug: Print all weapons
+    t.Logf("Found weapons: %+v", details.Weapons)
 
     // Check for test weapons
     foundWeapon1 := false

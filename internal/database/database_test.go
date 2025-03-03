@@ -220,6 +220,19 @@ func TestCreateAndDeleteWeapon(t *testing.T) {
     if err != nil {
         t.Fatalf("Failed to cleanup test weapon: %v", err)
     }
+
+    // Verify deletion
+    weapons, err = GetWeapons()
+    if err != nil {
+        t.Fatalf("Failed to get weapons after deletion: %v", err)
+    }
+
+    for _, w := range weapons {
+        if w.ID == newWeapon.ID {
+            t.Error("Weapon still exists after deletion")
+            break
+        }
+    }
 }
 
 func TestCreateAndDeleteGroup(t *testing.T) {
@@ -265,6 +278,19 @@ func TestCreateAndDeleteGroup(t *testing.T) {
     err = DeleteGroup(DB, fmt.Sprintf("%d", groupID))
     if err != nil {
         t.Fatalf("Failed to cleanup test group: %v", err)
+    }
+
+    // Verify deletion
+    groups, err = GetGroups()
+    if err != nil {
+        t.Fatalf("Failed to get groups after deletion: %v", err)
+    }
+
+    for _, g := range groups {
+        if g.ID == int(groupID) {
+            t.Error("Group still exists after deletion")
+            break
+        }
     }
 }
 
@@ -325,6 +351,19 @@ func TestUpdateWeapon(t *testing.T) {
     err = DeleteWeapon(fmt.Sprintf("%d", initialWeapon.ID))
     if err != nil {
         t.Fatalf("Failed to cleanup test weapon: %v", err)
+    }
+
+    // Verify deletion
+    weapons, err = GetWeapons()
+    if err != nil {
+        t.Fatalf("Failed to get weapons after deletion: %v", err)
+    }
+
+    for _, w := range weapons {
+        if w.ID == initialWeapon.ID {
+            t.Error("Weapon still exists after deletion")
+            break
+        }
     }
 }
 
@@ -401,6 +440,12 @@ func TestCreateGroupWithTeam(t *testing.T) {
     err = DeleteGroup(DB, fmt.Sprintf("%d", groupID))
     if err != nil {
         t.Fatalf("Failed to cleanup test group: %v", err)
+    }
+
+    // Verify deletion
+    details, err = GetGroupDetails(fmt.Sprintf("%d", groupID))
+    if err == nil {
+        t.Error("Expected error when getting deleted group details, got nil")
     }
 }
 
@@ -510,5 +555,11 @@ func TestCreateGroupWithVehicle(t *testing.T) {
     err = DeleteGroup(DB, fmt.Sprintf("%d", groupID))
     if err != nil {
         t.Fatalf("Failed to cleanup test group: %v", err)
+    }
+
+    // Verify deletion
+    details, err = GetGroupDetails(fmt.Sprintf("%d", groupID))
+    if err == nil {
+        t.Error("Expected error when getting deleted group details, got nil")
     }
 }

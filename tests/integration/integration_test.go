@@ -139,15 +139,17 @@ func newPage(t *testing.T) playwright.Page {
 }
 
 func TestGroupsList(t *testing.T) {
+	t.Log("Starting TestGroupsList")
 	page := newPage(t)
 	defer page.Close()
 
-	// Navigate to groups page
+	t.Log("Navigating to groups page")
 	if _, err := page.Goto("http://localhost:8080"); err != nil {
 		t.Fatalf("Failed to navigate to groups page: %v", err)
 	}
+	t.Log("Successfully loaded groups page")
 
-	// Highlight the element we're looking for
+	t.Log("Attempting to highlight Ranger Rifle Squad element")
 	if _, err := page.Evaluate(`() => {
 		const el = document.evaluate("//text()[contains(., 'Ranger Rifle Squad')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.parentElement;
 		el.style.border = '2px solid red';
@@ -155,6 +157,7 @@ func TestGroupsList(t *testing.T) {
 	}`); err != nil {
 		t.Logf("Failed to highlight element: %v", err)
 	}
+	t.Log("Successfully highlighted element")
 
 	// Check for Ranger Rifle Squad (from seed data)
 	text, err := page.TextContent("text='Ranger Rifle Squad'")
@@ -230,14 +233,16 @@ func TestGroupsList(t *testing.T) {
 }
 
 func TestWeaponsList(t *testing.T) {
+	t.Log("Starting TestWeaponsList")
 	page := newPage(t)
 
-	// Navigate to weapons page
+	t.Log("Navigating to weapons page")
 	if _, err := page.Goto("http://localhost:8080/weapons"); err != nil {
 		t.Fatalf("Failed to navigate to weapons page: %v", err)
 	}
+	t.Log("Successfully loaded weapons page")
 
-	// Check for existing weapons first
+	t.Log("Checking for existing M4A1 weapon")
 	text, err := page.TextContent("text='M4A1'")
 	if err != nil {
 		t.Fatalf("Failed to find M4A1: %v", err)
@@ -245,6 +250,7 @@ func TestWeaponsList(t *testing.T) {
 	if text == "" {
 		t.Error("M4A1 not found on page")
 	}
+	t.Log("Successfully found M4A1 on page")
 
 	// Check caliber
 	text, err = page.TextContent("text='5.56mm'")
@@ -398,13 +404,15 @@ func TestWeaponsList(t *testing.T) {
 }
 
 func TestCountriesList(t *testing.T) {
+	t.Log("Starting TestCountriesList")
 	page := newPage(t)
 	defer page.Close()
 
-	// Navigate to countries page
+	t.Log("Navigating to countries page")
 	if _, err := page.Goto("http://localhost:8080/countries"); err != nil {
 		t.Fatalf("Failed to navigate to countries page: %v", err)
 	}
+	t.Log("Successfully loaded countries page")
 
 	// Highlight and check for USA
 	if _, err := page.Evaluate(`() => {
@@ -470,17 +478,20 @@ func TestCountryDetails(t *testing.T) {
 }
 
 func TestGroupCreationAndDeletion(t *testing.T) {
+	t.Log("Starting TestGroupCreationAndDeletion")
 	page := newPage(t)
 
-	// Navigate to groups page
+	t.Log("Navigating to groups page")
 	if _, err := page.Goto("http://localhost:8080"); err != nil {
 		t.Fatalf("Failed to navigate to groups page: %v", err)
 	}
+	t.Log("Successfully loaded groups page")
 
-	// Wait for the page to be ready
+	t.Log("Waiting for page to be ready")
 	if err := page.WaitForLoadState(); err != nil {
 		t.Fatalf("Failed to wait for page load: %v", err)
 	}
+	t.Log("Page is ready")
 
 	// Click "Add New Group" button
 	addButton, err := page.QuerySelector("a:text('Add New Group')")
@@ -647,42 +658,51 @@ func TestGroupCreationAndDeletion(t *testing.T) {
 }
 
 func TestVehicleCreationAndDeletion(t *testing.T) {
+	t.Log("Starting TestVehicleCreationAndDeletion")
 	page := newPage(t)
 	defer page.Close()
 
-	// Navigate to vehicles page
+	t.Log("Navigating to vehicles page")
 	if _, err := page.Goto("http://localhost:8080/vehicles"); err != nil {
 		t.Fatalf("Failed to navigate to vehicles page: %v", err)
 	}
+	t.Log("Successfully loaded vehicles page")
 
-	// Wait for the page to be ready
+	t.Log("Waiting for page to be ready")
 	if err := page.WaitForLoadState(); err != nil {
 		t.Fatalf("Failed to wait for page load: %v", err)
 	}
+	t.Log("Page is ready")
 
 	// Create a new vehicle
 	vehicleName := "Test Bradley IFV"
 	vehicleType := "Infantry Fighting Vehicle"
 	vehicleArmament := "25mm M242 Bushmaster Chain Gun, TOW ATGM"
 
-	// Fill out the form directly (it's already on the page)
+	t.Log("Filling out vehicle creation form")
 	if err := page.Fill("#name", vehicleName); err != nil {
 		t.Fatalf("Failed to fill vehicle name: %v", err)
 	}
+	t.Log("Successfully filled vehicle name")
+
 	if err := page.Fill("#type", vehicleType); err != nil {
 		t.Fatalf("Failed to fill vehicle type: %v", err)
 	}
+	t.Log("Successfully filled vehicle type")
+
 	if err := page.Fill("#armament", vehicleArmament); err != nil {
 		t.Fatalf("Failed to fill vehicle armament: %v", err)
 	}
+	t.Log("Successfully filled vehicle armament")
 
-	// Set up a handler for any dialogs that might appear during form submission
+	t.Log("Setting up dialog handler")
 	page.On("dialog", func(dialog playwright.Dialog) {
 		t.Logf("Handling dialog: %s", dialog.Message())
 		dialog.Accept()
 	})
+	t.Log("Dialog handler set up successfully")
 
-	// Submit the form
+	t.Log("Looking for submit button")
 	submitButton, err := page.QuerySelector("#vehicleForm button[type='submit']")
 	if err != nil {
 		t.Fatalf("Failed to find submit button: %v", err)
@@ -690,26 +710,30 @@ func TestVehicleCreationAndDeletion(t *testing.T) {
 	if submitButton == nil {
 		t.Fatal("Submit button not found")
 	}
+	t.Log("Found submit button")
 
-	// Click submit and wait for navigation
+	t.Log("Submitting vehicle creation form")
 	if err := submitButton.Click(); err != nil {
 		t.Fatalf("Failed to click submit button: %v", err)
 	}
+	t.Log("Form submitted successfully")
 
-	// Wait for navigation
+	t.Log("Waiting for navigation after form submission")
 	if err := page.WaitForLoadState(); err != nil {
 		t.Fatalf("Failed to wait for navigation after form submission: %v", err)
 	}
+	t.Log("Navigation completed")
 
-	// Wait for the new vehicle to appear
+	t.Log("Verifying new vehicle appears in list")
 	selector := fmt.Sprintf(".card-title:has-text('%s')", vehicleName)
 	if _, err := page.WaitForSelector(selector); err != nil {
 		content, _ := page.Content()
 		t.Logf("Page content after submission: %s", content)
 		t.Fatalf("Failed to find new vehicle card title: %v", err)
 	}
+	t.Log("Successfully found new vehicle in list")
 
-	// Find the details link for the new vehicle (updated selector)
+	t.Log("Looking for details link")
 	detailsLink, err := page.QuerySelector(fmt.Sprintf(".card:has-text('%s') a.btn-outline-primary", vehicleName))
 	if err != nil {
 		t.Fatalf("Failed to find details link: %v", err)
@@ -719,18 +743,21 @@ func TestVehicleCreationAndDeletion(t *testing.T) {
 		t.Logf("Page content when looking for details link: %s", content)
 		t.Fatal("Details link not found")
 	}
+	t.Log("Found details link")
 
-	// Click the details link
+	t.Log("Clicking details link")
 	if err := detailsLink.Click(); err != nil {
 		t.Fatalf("Failed to click details link: %v", err)
 	}
+	t.Log("Successfully clicked details link")
 
-	// Wait for navigation
+	t.Log("Waiting for navigation to details page")
 	if err := page.WaitForLoadState(); err != nil {
 		t.Fatalf("Failed to wait for navigation to details page: %v", err)
 	}
+	t.Log("Successfully navigated to details page")
 
-	// Verify vehicle details
+	t.Log("Verifying vehicle details")
 	titleText, err := page.TextContent("h1")
 	if err != nil {
 		t.Fatalf("Failed to find title: %v", err)
@@ -738,19 +765,22 @@ func TestVehicleCreationAndDeletion(t *testing.T) {
 	if !strings.Contains(titleText, vehicleName) {
 		t.Errorf("Expected title to contain %q, got %q", vehicleName, titleText)
 	}
+	t.Log("Successfully verified vehicle details")
 
-	// Delete the vehicle
-	// Set up dialog handlers for confirmation and password prompts
+	t.Log("Setting up dialog handlers for deletion")
 	page.On("dialog", func(dialog playwright.Dialog) {
 		t.Logf("Handling dialog: %s", dialog.Message())
 		if strings.Contains(dialog.Message(), "Are you sure") {
+			t.Log("Accepting deletion confirmation dialog")
 			dialog.Accept()
 		} else if strings.Contains(dialog.Message(), "password") {
+			t.Log("Entering password in dialog")
 			dialog.Accept("adminpassword")
 		}
 	})
+	t.Log("Dialog handlers set up successfully")
 
-	// Find and click delete button (updated selector for details page)
+	t.Log("Looking for delete button")
 	deleteButton, err := page.QuerySelector("form[method='POST'][action*='/delete'] button.btn-danger")
 	if err != nil {
 		t.Fatalf("Failed to find delete button: %v", err)
@@ -760,23 +790,27 @@ func TestVehicleCreationAndDeletion(t *testing.T) {
 		t.Logf("Page content when looking for delete button: %s", content)
 		t.Fatal("Delete button not found")
 	}
+	t.Log("Found delete button")
 
-	// Click delete button
+	t.Log("Clicking delete button")
 	if err := deleteButton.Click(); err != nil {
 		t.Fatalf("Failed to click delete button: %v", err)
 	}
+	t.Log("Successfully clicked delete button")
 
-	// Wait for navigation
+	t.Log("Waiting for navigation after deletion")
 	if err := page.WaitForLoadState(); err != nil {
 		t.Fatalf("Failed to wait for navigation after deletion: %v", err)
 	}
+	t.Log("Navigation completed")
 
-	// Verify the vehicle is no longer in the list
+	t.Log("Verifying vehicle was deleted")
 	if _, err := page.WaitForSelector(fmt.Sprintf(".card-title:has-text('%s')", vehicleName), playwright.PageWaitForSelectorOptions{
 		State: playwright.WaitForSelectorStateDetached,
 	}); err != nil {
 		t.Error("Vehicle still found on page after deletion")
 	}
+	t.Log("Successfully verified vehicle was deleted")
 
 	t.Log("Test completed successfully")
 } 

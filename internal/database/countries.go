@@ -3,7 +3,7 @@ package database
 import (
 	"fmt"
 	"net/url"
-
+	"github.com/biter777/countries"
 	"orbat/internal/models"
 )
 
@@ -18,15 +18,21 @@ func GetCountries() ([]string, error) {
 	}
 	defer rows.Close()
 
-	var countries []string
+	var countryList []string
 	for rows.Next() {
-		var country string
-		if err := rows.Scan(&country); err != nil {
+		var countryCode string
+		if err := rows.Scan(&countryCode); err != nil {
 			return nil, err
 		}
-		countries = append(countries, country)
+		// Convert country code to standardized name
+		country := countries.ByName(countryCode)
+		if country != countries.Unknown {
+			countryList = append(countryList, country.Info().Name)
+		} else {
+			countryList = append(countryList, countryCode) // Fallback to code
+		}
 	}
-	return countries, nil
+	return countryList, nil
 }
 
 // GetCountryDetails retrieves detailed information about a country
@@ -37,15 +43,22 @@ func GetCountryDetails(countryName string) (models.CountryDetails, error) {
 		return models.CountryDetails{}, fmt.Errorf("invalid country name: %v", err)
 	}
 
-	var details models.CountryDetails
-	details.Name = decodedName
+	// Get the standardized country code
+	country := countries.ByName(decodedName)
+	if country == countries.Unknown {
+		return models.CountryDetails{}, fmt.Errorf("invalid country name: %s", decodedName)
+	}
 
-	// Update queries to use decoded name
+	var details models.CountryDetails
+	details.Name = country.Info().Name
+	countryCode := country.Info().Alpha2
+
+	// Update queries to use country code
 	groups, err := DB.Query(`
 		SELECT group_id, group_name, group_nationality, group_size 
 		FROM groups 
 		WHERE group_nationality = ?
-		ORDER BY group_name`, decodedName)
+		ORDER BY group_name`, countryCode)
 	if err != nil {
 		return details, err
 	}
@@ -53,8 +66,16 @@ func GetCountryDetails(countryName string) (models.CountryDetails, error) {
 
 	for groups.Next() {
 		var g models.Group
-		if err := groups.Scan(&g.ID, &g.Name, &g.Nationality, &g.Size); err != nil {
+		var gCountryCode string
+		if err := groups.Scan(&g.ID, &g.Name, &gCountryCode, &g.Size); err != nil {
 			return details, err
+		}
+		// Convert country code to name for display
+		gCountry := countries.ByName(gCountryCode)
+		if gCountry != countries.Unknown {
+			g.Nationality = gCountry.Info().Name
+		} else {
+			g.Nationality = gCountryCode
 		}
 		details.Groups = append(details.Groups, g)
 	}
@@ -95,7 +116,7 @@ func GetCountryDetails(countryName string) (models.CountryDetails, error) {
 		) membership ON m.member_id = membership.member_id
 		WHERE membership.group_nationality = ?
 		GROUP BY w.weapon_id
-		ORDER BY w.weapon_name`, decodedName)
+		ORDER BY w.weapon_name`, countryCode)
 	if err != nil {
 		return details, err
 	}
@@ -123,7 +144,7 @@ func GetCountryDetails(countryName string) (models.CountryDetails, error) {
 		JOIN groups g ON gv.group_id = g.group_id
 		WHERE g.group_nationality = ?
 		GROUP BY v.vehicle_id
-		ORDER BY v.vehicle_name`, decodedName)
+		ORDER BY v.vehicle_name`, countryCode)
 	if err != nil {
 		return details, err
 	}
@@ -138,4 +159,41 @@ func GetCountryDetails(countryName string) (models.CountryDetails, error) {
 	}
 
 	return details, nil
+}
+
+// StandardizeCountryCodes updates all existing country names to their standardized Alpha2 codes
+func StandardizeCountryCodes() error {
+	// First, get all unique nationalities
+	rows, err := DB.Query(`
+		SELECT DISTINCT group_nationality 
+		FROM groups`)
+	if err != nil {
+		return fmt.Errorf("failed to query nationalities: %v", err)
+	}
+	defer rows.Close()
+
+	// For each nationality, convert to standard code if needed
+	for rows.Next() {
+		var nationality string
+		if err := rows.Scan(&nationality); err != nil {
+			return fmt.Errorf("failed to scan nationality: %v", err)
+		}
+
+		// Try to get standardized country code
+		country := countries.ByName(nationality)
+		if country != countries.Unknown && country.Info().Alpha2 != nationality {
+			// Update all groups with this nationality to use the standard code
+			_, err = DB.Exec(`
+				UPDATE groups 
+				SET group_nationality = ? 
+				WHERE group_nationality = ?`,
+				country.Info().Alpha2, nationality)
+			if err != nil {
+				return fmt.Errorf("failed to update nationality %s to %s: %v",
+					nationality, country.Info().Alpha2, err)
+			}
+		}
+	}
+
+	return nil
 } 

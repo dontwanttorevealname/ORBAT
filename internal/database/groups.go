@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"orbat/internal/models"
+	"github.com/biter777/countries"
 )
 
 // GetGroups retrieves all groups from the database
@@ -25,8 +26,16 @@ func GetGroups() ([]models.Group, error) {
 	var groups []models.Group
 	for rows.Next() {
 		var g models.Group
-		if err := rows.Scan(&g.ID, &g.Name, &g.Nationality, &g.Size); err != nil {
+		var countryCode string
+		if err := rows.Scan(&g.ID, &g.Name, &countryCode, &g.Size); err != nil {
 			return nil, err
+		}
+		// Convert country code to name
+		country := countries.ByName(countryCode)
+		if country != countries.Unknown {
+			g.Nationality = country.Info().Name
+		} else {
+			g.Nationality = countryCode // Fallback to code if conversion fails
 		}
 		groups = append(groups, g)
 	}
@@ -41,14 +50,23 @@ func GetGroups() ([]models.Group, error) {
 // GetGroupDetails retrieves detailed information about a group
 func GetGroupDetails(groupID string) (models.GroupDetails, error) {
 	var group models.GroupDetails
+	var countryCode string
 	
 	// Get basic group info
 	err := DB.QueryRow(`
 		SELECT g.group_id, g.group_name, g.group_size, g.group_nationality 
 		FROM groups g 
-		WHERE g.group_id = ?`, groupID).Scan(&group.ID, &group.Name, &group.Size, &group.Nationality)
+		WHERE g.group_id = ?`, groupID).Scan(&group.ID, &group.Name, &group.Size, &countryCode)
 	if err != nil {
 		return group, fmt.Errorf("failed to get group details: %v", err)
+	}
+
+	// Convert country code to name
+	country := countries.ByName(countryCode)
+	if country != countries.Unknown {
+		group.Nationality = country.Info().Name
+	} else {
+		group.Nationality = countryCode // Fallback to code if conversion fails
 	}
 
 	// Get direct members (excluding team members and vehicle crew)

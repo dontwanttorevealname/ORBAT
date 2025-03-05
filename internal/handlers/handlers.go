@@ -5,17 +5,42 @@ import (
 	"net/http"
 	"path/filepath"
 	"reflect"
+	"fmt"
+	"strings"
 	
 	"orbat/internal/database"
+	"github.com/biter777/countries"
 )
 
 // Templates is the global template cache
 var templates *template.Template
 
-// Initialize sets up the templates
+// Initialize sets up the templates with custom functions
 func Initialize(templatesDir string) error {
 	var err error
-	templates, err = template.ParseGlob(filepath.Join(templatesDir, "*.html"))
+	
+	// Create function map
+	funcMap := template.FuncMap{
+		"countryCode": func(name string) string {
+			country := countries.ByName(name)
+			if country != countries.Unknown {
+				return country.Info().Alpha2
+			}
+			return name // Fallback to original name if not found
+		},
+		"countryFlag": func(name string) template.HTML {
+			country := countries.ByName(name)
+			if country != countries.Unknown {
+				code := strings.ToLower(country.Info().Alpha2)
+				// Return the country flag using Bootstrap's flag icons
+				return template.HTML(fmt.Sprintf(`<i class="fi fi-%s"></i>`, code))
+			}
+			return template.HTML(`<i class="bi bi-flag"></i>`) // Fallback to generic flag
+		},
+	}
+	
+	// Parse templates with the function map
+	templates, err = template.New("").Funcs(funcMap).ParseGlob(filepath.Join(templatesDir, "*.html"))
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -39,6 +40,11 @@ func main() {
 	}
 	defer database.Close()
 
+	// After database connection is established
+	if err := database.StandardizeCountryCodes(); err != nil {
+		log.Printf("Warning: Failed to standardize country codes: %v", err)
+	}
+
 	// Initialize storage
 	if err := storage.Initialize(); err != nil {
 		fmt.Printf("Fatal: %v\n", err)
@@ -71,6 +77,7 @@ func main() {
 	http.HandleFunc("/countries", handlers.CountriesHandler)
 	http.HandleFunc("/country/", handlers.CountryDetailsHandler)
 	http.HandleFunc("/health", handlers.HealthCheckHandler)
+	http.HandleFunc("/api/validate-country", handlers.ValidateCountryHandler)
 
 	// Get port from environment variable
 	port := os.Getenv("PORT")

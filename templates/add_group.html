@@ -32,7 +32,9 @@
                         </div>
                         <div class="col-md-6">
                             <label for="nationality" class="form-label">Nationality</label>
-                            <input type="text" id="nationality" name="nationality" class="form-control" required>
+                            <input type="text" id="nationality" class="form-control" required>
+                            <input type="hidden" id="nationality_code" name="nationality" required>
+                            <div id="nationality_feedback" class="invalid-feedback"></div>
                         </div>
                     </div>
                 </div>
@@ -163,6 +165,15 @@
 
             // Add initial member
             addMember('directMembers');
+
+            // Add country validation
+            const nationalityInput = document.getElementById('nationality');
+            let debounceTimeout;
+            
+            nationalityInput.addEventListener('input', function() {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(() => validateCountry(this), 300);
+            });
         });
 
         // Copy all the functions from edit_group.html
@@ -401,6 +412,31 @@
                 targetElement.classList.remove('show');
                 button.textContent = 'Expand';
             }
+        }
+
+        function validateCountry(input) {
+            const value = input.value.trim();
+            if (!value) return;
+
+            fetch(`/api/validate-country?name=${encodeURIComponent(value)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const feedbackEl = document.getElementById('nationality_feedback');
+                    const codeInput = document.getElementById('nationality_code');
+                    
+                    if (data.valid) {
+                        input.classList.remove('is-invalid');
+                        input.classList.add('is-valid');
+                        input.value = data.standardName;
+                        codeInput.value = data.code;
+                        feedbackEl.textContent = '';
+                    } else {
+                        input.classList.remove('is-valid');
+                        input.classList.add('is-invalid');
+                        codeInput.value = '';
+                        feedbackEl.textContent = 'Please enter a valid country name';
+                    }
+                });
         }
     </script>
 </body>

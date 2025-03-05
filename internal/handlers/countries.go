@@ -6,8 +6,9 @@ import (
 	"strings"
 
 	"orbat/internal/database"
-	"html/template"
 	"log"
+	"encoding/json"
+	"github.com/biter777/countries"
 )
 
 // CountriesHandler handles the countries list
@@ -19,11 +20,9 @@ func CountriesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Render template without extra WriteHeader
-	tmpl := template.Must(template.ParseFiles("templates/countries.html"))
-	if err := tmpl.Execute(w, countries); err != nil {
+	// Use the global templates variable instead of creating a new one
+	if err := templates.ExecuteTemplate(w, "countries.html", countries); err != nil {
 		log.Printf("Template execution error: %v", err)
-		// Don't write header here since template.Execute might have already written it
 	}
 }
 
@@ -49,6 +48,14 @@ func CountryDetailsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Validate and get the standardized country code
+		country := countries.ByName(newName)
+		if country == countries.Unknown {
+			http.Error(w, "Invalid country name", http.StatusBadRequest)
+			return
+		}
+		newCode := country.Info().Alpha2
+
 		tx, err := database.DB.Begin()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -56,9 +63,9 @@ func CountryDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		defer tx.Rollback()
 
-		// Update country name in groups table
+		// Update country code in groups table
 		_, err = tx.Exec("UPDATE groups SET group_nationality = ? WHERE group_nationality = ?", 
-			newName, countryName)
+			newCode, countryName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -69,7 +76,7 @@ func CountryDetailsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		http.Redirect(w, r, "/country/"+url.PathEscape(newName), http.StatusSeeOther)
+		http.Redirect(w, r, "/country/"+url.PathEscape(country.Info().Name), http.StatusSeeOther)
 		return
 	}
 
@@ -82,4 +89,33 @@ func CountryDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	if err := templates.ExecuteTemplate(w, "country_details.html", details); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// ValidateCountryHandler handles country validation
+func ValidateCountryHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	countryName := r.URL.Query().Get("name")
+	if countryName == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"valid": false,
+		})
+		return
+	}
+
+	// Try to find the country
+	country := countries.ByName(countryName)
+	if country == countries.Unknown {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"valid": false,
+		})
+		return
+	}
+
+	info := country.Info()
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"valid": true,
+		"standardName": info.Name,
+		"code": info.Alpha2,
+	})
 } 

@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"text/template"
 
 	"orbat/internal/database"
 )
@@ -25,9 +24,8 @@ func GroupsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Render template without extra WriteHeader
-	tmpl := template.Must(template.ParseFiles("templates/groups.html"))
-	if err := tmpl.Execute(w, groups); err != nil {
+	// Use the global templates variable instead of parsing the template directly
+	if err := templates.ExecuteTemplate(w, "groups.html", groups); err != nil {
 		log.Printf("Template execution error: %v", err)
 		// Don't write header here since template.Execute might have already written it
 	}
@@ -128,7 +126,7 @@ func AddGroupHandler(w http.ResponseWriter, r *http.Request) {
 	result, err := tx.Exec(`
 		INSERT INTO groups (group_name, group_nationality, group_size)
 		VALUES (?, ?, 0)
-	`, r.FormValue("name"), r.FormValue("nationality"))
+	`, r.FormValue("name"), r.FormValue("nationality"), 0)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

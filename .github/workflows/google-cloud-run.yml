@@ -25,6 +25,10 @@ jobs:
           echo "GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }}" >> .env.test
           echo "GOOGLE_APPLICATION_CREDENTIALS=credentials.json" >> .env.test
 
+      - name: Create credentials file
+        run: |
+          echo '${{ secrets.GCP_SA_KEY }}' > credentials.json
+
       - name: Install dependencies
         run: go mod download
 

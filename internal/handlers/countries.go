@@ -82,12 +82,14 @@ func CountryDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 	details, err := database.GetCountryDetails(countryName)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Error getting country details: %v", err)
+		http.Error(w, "Failed to get country details", http.StatusInternalServerError)
 		return
 	}
 
 	if err := templates.ExecuteTemplate(w, "country_details.html", details); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Template execution error: %v", err)
+		// Don't write an error header here since the template might have already written a response
 	}
 }
 

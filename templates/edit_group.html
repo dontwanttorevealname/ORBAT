@@ -34,7 +34,9 @@
                         </div>
                         <div class="col-md-6">
                             <label for="nationality" class="form-label">Nationality</label>
-                            <input type="text" id="nationality" name="nationality" class="form-control" required>
+                            <input type="text" id="nationality" class="form-control" required>
+                            <input type="hidden" id="nationality_code" name="nationality" required>
+                            <div id="nationality_feedback" class="invalid-feedback"></div>
                         </div>
                     </div>
                 </div>
@@ -115,7 +117,21 @@
             
             document.getElementById('group_id').value = groupData.ID;
             document.getElementById('name').value = groupData.Name;
-            document.getElementById('nationality').value = groupData.Nationality;
+            
+            // Initialize with current values
+            const nationalityInput = document.getElementById('nationality');
+            const nationalityCodeInput = document.getElementById('nationality_code');
+            
+            // Set initial values from the server-side data
+            nationalityInput.value = "{{.Nationality}}";
+            validateCountry(nationalityInput); // This will set both the display name and code
+            
+            // Add validation on input
+            let debounceTimeout;
+            nationalityInput.addEventListener('input', function() {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(() => validateCountry(this), 300);
+            });
             
             // Add direct members
             if (groupData.DirectMembers) {
@@ -138,6 +154,31 @@
                 });
             }
         });
+
+        function validateCountry(input) {
+            const value = input.value.trim();
+            if (!value) return;
+
+            fetch(`/api/validate-country?name=${encodeURIComponent(value)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const feedbackEl = document.getElementById('nationality_feedback');
+                    const codeInput = document.getElementById('nationality_code');
+                    
+                    if (data.valid) {
+                        input.classList.remove('is-invalid');
+                        input.classList.add('is-valid');
+                        input.value = data.standardName;
+                        codeInput.value = data.code;
+                        feedbackEl.textContent = '';
+                    } else {
+                        input.classList.remove('is-valid');
+                        input.classList.add('is-invalid');
+                        codeInput.value = '';
+                        feedbackEl.textContent = 'Please enter a valid country name';
+                    }
+                });
+        }
 
         function addMember(containerId, memberData = null) {
             let container = document.getElementById(containerId);

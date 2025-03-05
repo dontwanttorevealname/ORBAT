@@ -51,6 +51,8 @@ jobs:
           go run github.com/playwright-community/playwright-go/cmd/playwright@latest install --with-deps
 
       - name: Run tests
+        env:
+          CI: true  # This will trigger headless mode in the integration tests
         run: |
           go test ./... -v
           go test ./tests/integration -v

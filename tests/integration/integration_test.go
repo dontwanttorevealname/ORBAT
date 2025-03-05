@@ -14,6 +14,17 @@ import (
 
 var pw *playwright.Playwright
 var browser playwright.Browser
+var isHeadless bool
+
+func init() {
+	// Check if we're running in CI/CD environment
+	if os.Getenv("CI") != "" {
+		isHeadless = true
+	} else {
+		// Default to false for local development
+		isHeadless = false
+	}
+}
 
 func ensurePlaywrightInstalled() error {
 	// Check if playwright CLI is installed
@@ -58,10 +69,10 @@ func TestMain(m *testing.M) {
 	}
 	pw = pwt
 
-	// Launch browser with visible mode and slower actions
+	// Launch browser with configurable headless mode
 	browser, err = pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(false),
-		SlowMo:   playwright.Float(100), // Slows down Playwright operations by 100ms
+		Headless: playwright.Bool(isHeadless),
+		SlowMo:   playwright.Float(100),
 	})
 	if err != nil {
 		panic(fmt.Sprintf("Failed to launch browser: %v", err))

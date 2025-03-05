@@ -40,8 +40,20 @@ jobs:
         run: |
           ./run-test-migrations.sh
 
+      - name: Start application in test mode
+        run: |
+          ENV=test go run main.go &
+          # Wait for the application to start
+          sleep 5
+
+      - name: Install Playwright dependencies
+        run: |
+          go run github.com/playwright-community/playwright-go/cmd/playwright@latest install --with-deps
+
       - name: Run tests
-        run: go test ./... -v
+        run: |
+          go test ./... -v
+          go test ./tests/integration -v
 
       - name: Upload test results
         if: always()
@@ -51,6 +63,7 @@ jobs:
           path: |
             **/*_test.go
             **/testdata
+            tests/integration/test-results
           retention-days: 7
 
   deploy:

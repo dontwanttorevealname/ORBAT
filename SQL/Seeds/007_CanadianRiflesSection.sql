@@ -18,13 +18,13 @@ INSERT INTO members (member_id, member_role, member_rank) VALUES
 
 -- Weapon assignments
 INSERT INTO members_weapons (member_id, weapon_id) VALUES
-(58, 7),  -- Section Commander - C7A2
-(59, 7),  -- 2IC - C7A2
-(60, 7),  -- Rifleman - C7A2
-(61, 7),  -- Rifleman - C7A2
-(62, 7),  -- Rifleman - C7A2
-(63, 8),  -- Machine Gunner - C9A2
-(64, 8);  -- Machine Gunner - C9A2
+(58, 10),  -- Section Commander - C7A2
+(59, 10),  -- 2IC - C7A2
+(60, 10),  -- Rifleman - C7A2
+(61, 10),  -- Rifleman - C7A2
+(62, 10),  -- Rifleman - C7A2
+(63, 11),  -- Machine Gunner - C9A2
+(64, 11);  -- Machine Gunner - C9A2
 
 -- Teams
 INSERT INTO teams (team_id, team_name, team_size) VALUES
